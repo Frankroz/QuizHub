@@ -5,58 +5,158 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Take quiz · QuizHub</title>
     <link rel="stylesheet" href="/css/app.css" />
+    <script src="/js/quiz-navigation.js" defer></script>
   </head>
+
   <body>
     <div th:replace="~{fragments :: nav}"></div>
-    <main class="page narrow-wide">
-      <a class="back" href="/student">← All quizzes</a
-      ><span class="eyebrow" th:text="${quiz.subject}"></span>
-      <h1 th:text="${quiz.title}"></h1>
-      <p th:text="${quiz.description}"></p>
-      <div
-        class="notice"
-        th:text="'Answer all ' + ${quiz.questions.size()} +
-              ' questions. Your score and explanations appear after submission.'"
-      ></div>
+
+    <main class="page narrow-wide quiz-taking-page">
+      <a class="back" href="/student">← All quizzes</a>
+
+      <div class="quiz-page-heading">
+        <span class="eyebrow" th:text="${quiz.subject}">Subject</span>
+        <h1 th:text="${quiz.title}">Quiz title</h1>
+        <p th:text="${quiz.description}">Quiz description</p>
+      </div>
+
+      <div class="notice">
+        Answer all
+        <strong th:text="${#lists.size(quiz.questions)}">10</strong>
+        questions. Your score and explanations will appear after submission.
+      </div>
+
       <form
         method="post"
         th:action="@{/student/quizzes/{id}/submit(id=${quiz.id})}"
         class="stack"
         id="quizForm"
       >
-        <fieldset class="question-block" th:each="q,stat : ${quiz.questions}">
-          <legend th:text="'Question ' + ${stat.count}"></legend>
-          <h3 th:text="${q.questionText}"></h3>
-          <label class="choice"
-            ><input
-              type="radio"
-              th:name="'q'+${q.id}"
-              value="A"
-              required /><span th:text="${q.optionA}"></span></label
-          ><label class="choice"
-            ><input
-              type="radio"
-              th:name="'q'+${q.id}"
-              value="B"
-              required /><span th:text="${q.optionB}"></span></label
-          ><label class="choice"
-            ><input
-              type="radio"
-              th:name="'q'+${q.id}"
-              value="C"
-              required /><span th:text="${q.optionC}"></span></label
-          ><label class="choice"
-            ><input
-              type="radio"
-              th:name="'q'+${q.id}"
-              value="D"
-              required /><span th:text="${q.optionD}"></span
-          ></label>
-        </fieldset>
-        <div class="form-footer">
-          <span class="muted">Check your answers before submitting.</span
-          ><button class="btn" type="submit">Submit answers</button>
+        <!-- Progress information -->
+        <section class="quiz-progress-card">
+          <div class="quiz-progress-header">
+            <div>
+              <span class="eyebrow">YOUR PROGRESS</span>
+              <h3>
+                Question
+                <span id="currentQuestion">1</span>
+                of
+                <span
+                  id="totalQuestions"
+                  th:text="${#lists.size(quiz.questions)}"
+                  >10</span
+                >
+              </h3>
+            </div>
+
+            <strong id="answeredCount">0 answered</strong>
+          </div>
+
+          <div class="progress-track">
+            <div
+              class="progress-fill"
+              id="quizProgressBar"
+              style="width: 0%"
+            ></div>
+          </div>
+
+          <!-- Question navigation -->
+          <div class="question-navigation" id="questionNavigation">
+            <button
+              type="button"
+              class="question-nav-btn"
+              th:each="q,stat : ${quiz.questions}"
+              th:attr="data-question-index=${stat.index}"
+              th:text="${stat.count}"
+              th:classappend="${stat.index == 0 ? ' active' : ''}"
+              th:aria-label="'Go to question ' + ${stat.count}"
+            >
+              1
+            </button>
+          </div>
+
+          <div class="question-legend">
+            <span>
+              <span class="legend-dot current-dot"></span>
+              Current
+            </span>
+
+            <span>
+              <span class="legend-dot answered-dot"></span>
+              Answered
+            </span>
+
+            <span>
+              <span class="legend-dot unanswered-dot"></span>
+              Unanswered
+            </span>
+          </div>
+        </section>
+
+        <!-- Questions -->
+        <div id="questionContainer">
+          <fieldset
+            class="question-block navigable-question"
+            th:each="q,stat : ${quiz.questions}"
+            th:attr="data-question-index=${stat.index}"
+            th:hidden="${stat.index != 0}"
+          >
+            <legend>
+              Question
+              <span th:text="${stat.count}">1</span>
+            </legend>
+
+            <h3 th:text="${q.questionText}">Question text</h3>
+
+            <label class="choice">
+              <input type="radio" th:name="'q' + ${q.id}" value="A" />
+              <span th:text="${q.optionA}">Option A</span>
+            </label>
+
+            <label class="choice">
+              <input type="radio" th:name="'q' + ${q.id}" value="B" />
+              <span th:text="${q.optionB}">Option B</span>
+            </label>
+
+            <label class="choice">
+              <input type="radio" th:name="'q' + ${q.id}" value="C" />
+              <span th:text="${q.optionC}">Option C</span>
+            </label>
+
+            <label class="choice">
+              <input type="radio" th:name="'q' + ${q.id}" value="D" />
+              <span th:text="${q.optionD}">Option D</span>
+            </label>
+          </fieldset>
         </div>
+
+        <!-- Navigation buttons -->
+        <div class="quiz-navigation-footer">
+          <button
+            type="button"
+            class="btn secondary"
+            id="previousQuestion"
+            disabled
+          >
+            ← Previous
+          </button>
+
+          <button type="button" class="btn" id="nextQuestion">Next →</button>
+
+          <button
+            type="submit"
+            class="btn submit-quiz-btn"
+            id="submitQuiz"
+            hidden
+          >
+            Submit answers ✓
+          </button>
+        </div>
+
+        <p class="muted quiz-footer-note">
+          You can move between questions and change your answers before
+          submitting.
+        </p>
       </form>
     </main>
   </body>

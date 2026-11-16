@@ -408,4 +408,215 @@
 }
 
 
+/* Quiz-taking page */
+.quiz-taking-page {
+  max-width: 900px;
+}
+
+.quiz-page-heading {
+  margin: 18px 0 24px;
+}
+
+.quiz-page-heading h1 {
+  margin: 8px 0;
+}
+
+.quiz-page-heading p {
+  color: var(--muted, #6b7280);
+}
+
+/* Quiz progress card */
+.quiz-progress-card {
+  padding: 22px;
+  margin: 24px 0;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+}
+
+.quiz-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.quiz-progress-header h3 {
+  margin: 7px 0 0;
+}
+
+.quiz-progress-header > strong {
+  color: var(--muted, #6b7280);
+  font-size: 0.9rem;
+}
+
+/* Question number buttons */
+.question-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.question-nav-btn {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  color: var(--text, #374151);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.question-nav-btn:hover {
+  border-color: var(--primary, #4f46e5);
+}
+
+.question-nav-btn.active {
+  background: var(--primary, #4f46e5);
+  border-color: var(--primary, #4f46e5);
+  color: #fff;
+}
+
+.question-nav-btn.answered:not(.active) {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.question-nav-btn.unanswered:not(.active) {
+  background: var(--surface, #fff);
+  border-color: #d1d5db;
+  color: var(--muted, #6b7280);
+}
+
+.question-nav-btn:focus-visible {
+  outline: 3px solid var(--primary, #4f46e5);
+  outline-offset: 3px;
+}
+
+/* Question navigation legend */
+.question-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 20px;
+  color: var(--muted, #6b7280);
+  font-size: 0.82rem;
+}
+
+.question-legend > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Reuse legend-dot if already defined by your dashboard CSS. */
+.question-legend .legend-dot {
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 50%;
+}
+
+.current-dot {
+  background: var(--primary, #4f46e5);
+}
+
+.answered-dot {
+  background: #16a34a;
+}
+
+.unanswered-dot {
+  background: #9ca3af;
+}
+
+/* Question card */
+.navigable-question {
+  min-width: 0;
+  padding: 28px;
+  margin: 0;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+}
+
+.navigable-question legend {
+  padding: 0 8px;
+  font-weight: 700;
+}
+
+.navigable-question h3 {
+  margin: 10px 0 24px;
+  line-height: 1.5;
+}
+
+.navigable-question[hidden] {
+  display: none !important;
+}
+
+/* Previous and next buttons */
+.quiz-navigation-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.quiz-navigation-footer button {
+  min-width: 130px;
+}
+
+.quiz-navigation-footer button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.submit-quiz-btn {
+  margin-left: auto;
+}
+
+.quiz-footer-note {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  .quiz-progress-card {
+    padding: 17px;
+  }
+
+  .quiz-progress-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .question-navigation {
+    gap: 8px;
+  }
+
+  .question-nav-btn {
+    width: 38px;
+    height: 38px;
+  }
+
+  .navigable-question {
+    padding: 20px 16px;
+  }
+
+  .quiz-navigation-footer {
+    flex-wrap: wrap;
+  }
+
+  .quiz-navigation-footer button {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 @media(max-width:760px){.nav{height:auto;min-height:70px;padding:16px 20px;align-items:flex-start;gap:12px}.nav nav{gap:10px;flex-wrap:wrap;justify-content:flex-end}.feature-grid,.quiz-grid{grid-template-columns:1fr}.hero,.page{padding:42px 18px}.pagehead{align-items:flex-start;flex-direction:column}.pagehead h1{font-size:2.3rem}.options{grid-template-columns:1fr}.form-footer,.history-row{align-items:flex-start;flex-direction:column}.searchbar{flex-wrap:wrap}.searchbar input{flex-basis:100%}}
