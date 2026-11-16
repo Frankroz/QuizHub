@@ -2,8 +2,10 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
     <title>Take quiz · QuizHub</title>
+
     <link rel="stylesheet" href="/css/app.css" />
     <script src="/js/quiz-navigation.js" defer></script>
   </head>
@@ -15,15 +17,17 @@
       <a class="back" href="/student">← All quizzes</a>
 
       <div class="quiz-page-heading">
-        <span class="eyebrow" th:text="${quiz.subject}">Subject</span>
-        <h1 th:text="${quiz.title}">Quiz title</h1>
-        <p th:text="${quiz.description}">Quiz description</p>
+        <span class="eyebrow" th:text="${quiz.subject}"></span>
+
+        <h1 th:text="${quiz.title}"></h1>
+
+        <p th:text="${quiz.description}"></p>
       </div>
 
       <div class="notice">
-        Answer all
-        <strong th:text="${#lists.size(quiz.questions)}">10</strong>
-        questions. Your score and explanations will appear after submission.
+        Answer all 10 questions. The question and answer order has been
+        randomized for this attempt. Your score and explanations will appear
+        after submission.
       </div>
 
       <form
@@ -32,24 +36,20 @@
         class="stack"
         id="quizForm"
       >
-        <!-- Progress information -->
+        <!-- Identifies the saved randomized attempt. -->
+        <input type="hidden" name="attemptId" th:value="${attempt.id}" />
+
+        <!-- Progress -->
         <section class="quiz-progress-card">
           <div class="quiz-progress-header">
-            <div>
-              <span class="eyebrow">YOUR PROGRESS</span>
-              <h3>
-                Question
-                <span id="currentQuestion">1</span>
-                of
-                <span
-                  id="totalQuestions"
-                  th:text="${#lists.size(quiz.questions)}"
-                  >10</span
-                >
-              </h3>
-            </div>
+            <strong>
+              Question
+              <span id="currentQuestion">1</span>
+              of
+              <span id="totalQuestions">10</span>
+            </strong>
 
-            <strong id="answeredCount">0 answered</strong>
+            <span class="muted" id="answeredCount"> 0 of 10 answered </span>
           </div>
 
           <div class="progress-track">
@@ -59,20 +59,20 @@
               style="width: 0%"
             ></div>
           </div>
+        </section>
 
-          <!-- Question navigation -->
-          <div class="question-navigation" id="questionNavigation">
+        <!-- Question navigation -->
+        <section class="question-navigation">
+          <h3>Navigate questions</h3>
+
+          <div class="question-nav-grid">
             <button
               type="button"
               class="question-nav-btn"
-              th:each="q,stat : ${quiz.questions}"
-              th:attr="data-question-index=${stat.index}"
+              th:each="item, stat : ${randomizedQuestions}"
               th:text="${stat.count}"
-              th:classappend="${stat.index == 0 ? ' active' : ''}"
-              th:aria-label="'Go to question ' + ${stat.count}"
-            >
-              1
-            </button>
+              th:attr="data-question-index=${stat.index}"
+            ></button>
           </div>
 
           <div class="question-legend">
@@ -93,48 +93,44 @@
           </div>
         </section>
 
-        <!-- Questions -->
-        <div id="questionContainer">
-          <fieldset
-            class="question-block navigable-question"
-            th:each="q,stat : ${quiz.questions}"
-            th:attr="data-question-index=${stat.index}"
-            th:hidden="${stat.index != 0}"
-          >
-            <legend>
-              Question
-              <span th:text="${stat.count}">1</span>
-            </legend>
+        <!-- Questions in their saved randomized order -->
+        <div
+          th:each="item, stat : ${randomizedQuestions}"
+          class="navigable-question question-block"
+          th:attr="data-question-index=${stat.index}"
+          th:hidden="${stat.index != 0}"
+        >
+          <div class="question-heading">
+            <span class="eyebrow" th:text="'Question ' + ${stat.count}"> </span>
 
-            <h3 th:text="${q.questionText}">Question text</h3>
+            <span class="muted"> 1 point </span>
+          </div>
 
-            <label class="choice">
-              <input type="radio" th:name="'q' + ${q.id}" value="A" />
-              <span th:text="${q.optionA}">Option A</span>
+          <h3 th:text="${item.question.questionText}"></h3>
+
+          <!-- Options are displayed in shuffled order.
+                 Their submitted values remain the ORIGINAL A/B/C/D keys. -->
+          <div class="question-options">
+            <label class="choice" th:each="option : ${item.options}">
+              <input
+                type="radio"
+                th:name="'q' + ${item.question.id}"
+                th:value="${option.originalOption}"
+              />
+
+              <span class="choice-letter" th:text="${option.displayLabel}">
+              </span>
+
+              <span th:text="${option.text}"></span>
             </label>
-
-            <label class="choice">
-              <input type="radio" th:name="'q' + ${q.id}" value="B" />
-              <span th:text="${q.optionB}">Option B</span>
-            </label>
-
-            <label class="choice">
-              <input type="radio" th:name="'q' + ${q.id}" value="C" />
-              <span th:text="${q.optionC}">Option C</span>
-            </label>
-
-            <label class="choice">
-              <input type="radio" th:name="'q' + ${q.id}" value="D" />
-              <span th:text="${q.optionD}">Option D</span>
-            </label>
-          </fieldset>
+          </div>
         </div>
 
-        <!-- Navigation buttons -->
+        <!-- Navigation controls -->
         <div class="quiz-navigation-footer">
           <button
             type="button"
-            class="btn secondary"
+            class="btn btn-secondary"
             id="previousQuestion"
             disabled
           >
@@ -149,7 +145,7 @@
             id="submitQuiz"
             hidden
           >
-            Submit answers ✓
+            Submit answers
           </button>
         </div>
 

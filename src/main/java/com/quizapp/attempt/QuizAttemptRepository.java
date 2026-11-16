@@ -25,4 +25,8 @@ public interface QuizAttemptRepository
 
     long countByStudent_UsernameAndQuiz_Id(
             String username, Long quizId);
+
+    @EntityGraph(attributePaths = {"quiz", "quiz.questions", "student"})
+    Optional<QuizAttempt> findByIdAndStudentUsernameAndQuiz_Id(
+            Long attemptId, String username, Long quizId);
 }

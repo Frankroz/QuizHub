@@ -113,7 +113,10 @@ CREATE TABLE quiz_attempts (
     score INT UNSIGNED NOT NULL DEFAULT 0,
     total_questions INT UNSIGNED NOT NULL DEFAULT 10,
 
-    submitted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    question_order TEXT,
+    option_orders LONGTEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'SUBMITTED',
 
     CONSTRAINT fk_attempt_student
         FOREIGN KEY (student_id)

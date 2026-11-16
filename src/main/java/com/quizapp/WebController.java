@@ -4,8 +4,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
@@ -24,6 +27,10 @@ import com.quizapp.attempt.AttemptAnswer;
 import com.quizapp.attempt.AttemptAnswerRepository;
 import com.quizapp.attempt.QuizAttempt;
 import com.quizapp.attempt.QuizAttemptRepository;
+import com.quizapp.attempt.QuizOptionView;
+import com.quizapp.attempt.QuizQuestionView;
+import com.quizapp.attempt.QuizRandomizer;
+import com.quizapp.attempt.QuizRandomizer.RandomizedQuiz;
 import com.quizapp.quiz.Question;
 import com.quizapp.quiz.Quiz;
 import com.quizapp.quiz.QuizRepository;
@@ -503,60 +510,323 @@ public class WebController {
     }
 
     @GetMapping("/student/quizzes/{id}")
-    public String takeQuiz(@PathVariable Long id, Model model, RedirectAttributes ra) {
+    @Transactional
+    public String takeQuiz(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long attemptId,
+            Authentication auth,
+            Model model,
+            RedirectAttributes ra) {
+
         Quiz quiz = quizzes.findWithQuestionsById(id).orElse(null);
-        if (quiz == null || !quiz.getStatus().equals("PUBLISHED")) {
+
+        if (quiz == null || !"PUBLISHED".equals(quiz.getStatus())) {
             throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, "Quiz not found");
+                    HttpStatus.NOT_FOUND,
+                    "Quiz not found"
+            );
         }
+
+        // Keep the assignment requirement: exactly 10 questions.
+        if (quiz.getQuestions().size() != 10) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "This quiz must contain exactly 10 questions."
+            );
+        }
+
+        QuizAttempt attempt;
+
+        if (attemptId != null) {
+            // Refreshing or navigating back to this URL reuses the same attempt.
+            attempt = attempts
+                    .findByIdAndStudentUsernameAndQuiz_Id(
+                            attemptId,
+                            auth.getName(),
+                            id
+                    )
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Quiz attempt not found"
+                    ));
+
+            if ("SUBMITTED".equals(attempt.getStatus())) {
+                return "redirect:/attempt/" + attempt.getId();
+            }
+
+        } else {
+            long used = attempts.countByStudent_UsernameAndQuiz_Id(
+                    auth.getName(),
+                    id
+            );
+
+            if (used >= 3) {
+                ra.addFlashAttribute(
+                        "errorMessage",
+                        "You have used all 3 attempts for this quiz."
+                );
+                return "redirect:/student/history";
+            }
+
+            // Generate and persist a new random layout.
+            RandomizedQuiz randomized = QuizRandomizer.create(
+                    quiz.getQuestions()
+            );
+
+            User student = users.findByUsername(auth.getName())
+                    .orElseThrow();
+
+            attempt = attempts.save(new QuizAttempt(
+                    student,
+                    quiz,
+                    randomized.questionOrder(),
+                    randomized.optionOrders()
+            ));
+
+            // Redirect so refreshes reuse this attempt ID.
+            return "redirect:/student/quizzes/" + id
+                    + "?attemptId=" + attempt.getId();
+        }
+
+        List<Long> questionIds = QuizRandomizer.readQuestionOrder(
+                attempt.getQuestionOrder()
+        );
+
+        Map<String, List<String>> optionOrders
+                = QuizRandomizer.readOptionOrders(attempt.getOptionOrders());
+
+        Map<Long, Question> questionsById = new HashMap<>();
+
+        for (Question question : quiz.getQuestions()) {
+            questionsById.put(question.getId(), question);
+        }
+
+        List<QuizQuestionView> randomizedQuestions = new ArrayList<>();
+
+        for (Long questionId : questionIds) {
+            Question question = questionsById.get(questionId);
+
+            if (question == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Invalid question order in this attempt."
+                );
+            }
+
+            List<String> originalOptions = optionOrders.get(
+                    questionId.toString()
+            );
+
+            if (!isValidOptionOrder(originalOptions)) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Invalid answer order in this attempt."
+                );
+            }
+
+            List<QuizOptionView> displayedOptions = new ArrayList<>();
+
+            for (int i = 0; i < originalOptions.size(); i++) {
+                String originalKey = originalOptions.get(i);
+
+                displayedOptions.add(new QuizOptionView(
+                        String.valueOf((char) ('A' + i)),
+                        originalKey,
+                        getOptionText(question, originalKey)
+                ));
+            }
+
+            randomizedQuestions.add(new QuizQuestionView(
+                    question,
+                    displayedOptions
+            ));
+        }
+
+        if (randomizedQuestions.size() != 10) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "This attempt does not contain 10 questions."
+            );
+        }
+
+        model.addAttribute("attempt", attempt);
+        model.addAttribute("randomizedQuestions", randomizedQuestions);
         model.addAttribute("quiz", quiz);
         return "student/take-quiz";
     }
 
     @PostMapping("/student/quizzes/{id}/submit")
     @Transactional
-    public String submit(@PathVariable Long id, @RequestParam Map<String, String> form, Authentication auth,
+    public String submit(
+            @PathVariable Long id,
+            @RequestParam Map<String, String> form,
+            Authentication auth,
             RedirectAttributes ra) {
-        Quiz quiz = quizzes.findWithQuestionsById(id).orElse(null);
-        if (quiz == null || !quiz.getStatus().equals("PUBLISHED")
-                || quiz.getQuestions().isEmpty()
-                || quiz.getQuestions().size() > 10) {
-            ra.addFlashAttribute("error",
-                    "Please answer all " + quiz.getQuestions().size() + " questions.");
+
+        String attemptIdValue = form.get("attemptId");
+
+        if (attemptIdValue == null || attemptIdValue.isBlank()) {
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "Your quiz attempt could not be identified. Please try again."
+            );
             return "redirect:/student";
         }
-        Map<Long, String> chosen = new HashMap<>();
+
+        Long attemptId;
+
+        try {
+            attemptId = Long.valueOf(attemptIdValue);
+        } catch (NumberFormatException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid attempt ID."
+            );
+        }
+
+        QuizAttempt attempt = attempts
+                .findByIdAndStudentUsernameAndQuiz_Id(
+                        attemptId,
+                        auth.getName(),
+                        id
+                )
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Quiz attempt not found."
+                ));
+
+        if ("SUBMITTED".equals(attempt.getStatus())) {
+            return "redirect:/attempt/" + attempt.getId();
+        }
+
+        Quiz quiz = quizzes.findWithQuestionsById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Quiz not found."
+                ));
+
+        if (!"PUBLISHED".equals(quiz.getStatus())
+                || quiz.getQuestions().size() != 10) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "This quiz is no longer available."
+            );
+        }
+
+        // Read the exact randomized order saved for this attempt.
+        List<Long> questionOrder = QuizRandomizer.readQuestionOrder(
+                attempt.getQuestionOrder()
+        );
+
+        Map<String, List<String>> optionOrders
+                = QuizRandomizer.readOptionOrders(attempt.getOptionOrders());
+
+        Map<Long, Question> questionsById = new HashMap<>();
+
+        for (Question question : quiz.getQuestions()) {
+            questionsById.put(question.getId(), question);
+        }
+
+        // Reject altered, incomplete, or duplicated question orders.
+        Set<Long> expectedQuestionIds = questionsById.keySet();
+        Set<Long> submittedQuestionIds = new HashSet<>(questionOrder);
+
+        if (questionOrder.size() != 10
+                || submittedQuestionIds.size() != 10
+                || !submittedQuestionIds.equals(expectedQuestionIds)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "The saved question order is invalid."
+            );
+        }
+
         int score = 0;
-        for (Question q : quiz.getQuestions()) {
-            String value = form.get("q" + q.getId());
-            if (value == null || !List.of("A", "B", "C", "D").contains(value)) {
-                ra.addFlashAttribute("error", "Please answer all 10 questions.");
-                return "redirect:/student/quizzes/" + id;
+
+        Map<Long, String> chosen = new LinkedHashMap<>();
+
+        for (Long questionId : questionOrder) {
+
+            Question question = questionsById.get(questionId);
+
+            List<String> validOrder = optionOrders.get(
+                    questionId.toString()
+            );
+
+            if (!isValidOptionOrder(validOrder)) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "The saved answer order is invalid."
+                );
             }
-            chosen.put(q.getId(), value);
-            if (q.getCorrectOption().equals(value)) {
+
+            // The browser sends the ORIGINAL option key, not its displayed label.
+            String selected = form.get("q" + questionId);
+
+            if (selected == null || !validOrder.contains(selected)) {
+                ra.addFlashAttribute(
+                        "errorMessage",
+                        "Please answer all 10 questions."
+                );
+
+                return "redirect:/student/quizzes/" + id
+                        + "?attemptId=" + attempt.getId();
+            }
+
+            chosen.put(questionId, selected);
+
+            if (question.getCorrectOption().equals(selected)) {
                 score++;
             }
         }
-        User student = users.findByUsername(auth.getName()).orElseThrow();
-        int totalQuestions = quiz.getQuestions().size();
-        long used = attempts.countByStudent_UsernameAndQuiz_Id(
-                auth.getName(), id);
 
-        if (used >= 3) {
-            ra.addFlashAttribute(
-                    "errorMessage",
-                    "You have used all 3 attempts for this quiz.");
+        // Save the answers using their original option keys.
+        for (Long questionId : questionOrder) {
 
-            return "redirect:/student/history";
+            Question question = questionsById.get(questionId);
+            String selected = chosen.get(questionId);
+
+            answers.save(new AttemptAnswer(
+                    attempt,
+                    question,
+                    selected,
+                    question.getCorrectOption().equals(selected)
+            ));
         }
-        QuizAttempt attempt = attempts.save(new QuizAttempt(student, quiz, score, totalQuestions));
-        for (Question q : quiz.getQuestions()) {
-            answers.save(new AttemptAnswer(attempt, q, chosen.get(q.getId()),
-                    q.getCorrectOption().equals(chosen.get(q.getId()))));
-        }
+
+        attempt.complete(score);
+        attempts.save(attempt);
+
         ra.addFlashAttribute("attemptId", attempt.getId());
         return "redirect:/attempt/" + attempt.getId();
+    }
+
+    // Returns the original text associated with an option key.
+    private String getOptionText(Question question, String key) {
+
+        return switch (key) {
+            case "A" ->
+                question.getOptionA();
+            case "B" ->
+                question.getOptionB();
+            case "C" ->
+                question.getOptionC();
+            case "D" ->
+                question.getOptionD();
+            default ->
+                throw new IllegalArgumentException(
+                        "Invalid option key: " + key
+                );
+        };
+    }
+
+    // Ensures an option order contains A, B, C and D exactly once.
+    private boolean isValidOptionOrder(List<String> options) {
+
+        return options != null
+                && options.size() == 4
+                && new HashSet<>(options).equals(
+                        Set.of("A", "B", "C", "D")
+                );
     }
 
     @GetMapping("/student/attempts/{attemptId}/review")

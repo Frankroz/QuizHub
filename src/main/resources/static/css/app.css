@@ -619,4 +619,95 @@
   }
 }
 
+
+.question-nav-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(40px, 1fr));
+    gap: 10px;
+}
+
+.question-nav-btn {
+    min-height: 42px;
+    border: 1px solid var(--border, #d5dce5);
+    border-radius: 10px;
+    background: var(--surface, #fff);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.question-nav-btn.active {
+    background: var(--primary, #2563eb);
+    color: white;
+    border-color: var(--primary, #2563eb);
+}
+
+.question-nav-btn.answered:not(.active) {
+    border-color: #16a34a;
+    color: #15803d;
+}
+
+.question-nav-btn.unanswered:not(.active) {
+    color: var(--muted, #64748b);
+}
+
+.question-options {
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.choice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--border, #d5dce5);
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.choice:has(input:checked) {
+    border-color: var(--primary, #2563eb);
+    background: var(--surface-highlight, #eff6ff);
+}
+
+.choice-letter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    background: var(--surface, #f1f5f9);
+    font-weight: 700;
+}
+
+.navigable-question[hidden] {
+    display: none !important;
+}
+
+.quiz-navigation-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.submit-quiz-btn[hidden],
+#nextQuestion[hidden] {
+    display: none !important;
+}
+
+@media (max-width: 520px) {
+    .quiz-navigation-footer {
+        flex-wrap: wrap;
+    }
+
+    .quiz-navigation-footer button {
+        flex: 1;
+    }
+}
+
+
 @media(max-width:760px){.nav{height:auto;min-height:70px;padding:16px 20px;align-items:flex-start;gap:12px}.nav nav{gap:10px;flex-wrap:wrap;justify-content:flex-end}.feature-grid,.quiz-grid{grid-template-columns:1fr}.hero,.page{padding:42px 18px}.pagehead{align-items:flex-start;flex-direction:column}.pagehead h1{font-size:2.3rem}.options{grid-template-columns:1fr}.form-footer,.history-row{align-items:flex-start;flex-direction:column}.searchbar{flex-wrap:wrap}.searchbar input{flex-basis:100%}}
