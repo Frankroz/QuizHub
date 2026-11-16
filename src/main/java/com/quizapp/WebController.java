@@ -1,10 +1,12 @@
 package com.quizapp;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -27,6 +29,8 @@ import com.quizapp.quiz.Quiz;
 import com.quizapp.quiz.QuizRepository;
 import com.quizapp.quiz.StudentDashboardStats;
 import com.quizapp.quiz.StudentQuizResult;
+import com.quizapp.quiz.TeacherDashboardStats;
+import com.quizapp.quiz.TeacherQuizStats;
 import com.quizapp.user.User;
 import com.quizapp.user.UserRepository;
 
@@ -91,8 +95,137 @@ public class WebController {
     }
 
     @GetMapping("/teacher")
-    public String teacher(Authentication auth, Model model) {
-        model.addAttribute("quizzes", quizzes.findByTeacherUsernameOrderByIdDesc(auth.getName()));
+    @Transactional
+    public String teacherDashboard(
+            Authentication auth,
+            Model model) {
+
+        final int PASS_PERCENTAGE = 60;
+
+        // 1. Get all quizzes belonging to this teacher.
+        List<Quiz> teacherQuizzes
+                = quizzes.findByTeacherUsernameOrderByIdDesc(
+                        auth.getName()
+                );
+
+        // 2. Get all attempts for quizzes belonging to this teacher.
+        List<QuizAttempt> allAttempts
+                = attempts.findByQuizTeacherUsernameOrderBySubmittedAtDesc(
+                        auth.getName()
+                );
+
+        // 3. Overall quiz statistics.
+        long totalQuizzes = teacherQuizzes.size();
+
+        long publishedQuizzes = teacherQuizzes.stream()
+                .filter(q -> "PUBLISHED".equals(q.getStatus()))
+                .count();
+
+        long draftQuizzes = teacherQuizzes.stream()
+                .filter(q -> "DRAFT".equals(q.getStatus()))
+                .count();
+
+        long totalAttempts = allAttempts.size();
+
+        long uniqueStudents = allAttempts.stream()
+                .map(a -> a.getStudent().getUsername())
+                .distinct()
+                .count();
+
+        long passedAttempts = allAttempts.stream()
+                .filter(a -> a.getTotalQuestions() > 0
+                        && a.getScore() * 100.0 / a.getTotalQuestions()
+                        >= PASS_PERCENTAGE)
+                .count();
+
+        long failedAttempts = totalAttempts - passedAttempts;
+
+        double averageScore = allAttempts.stream()
+                .filter(a -> a.getTotalQuestions() > 0)
+                .mapToDouble(a
+                        -> a.getScore() * 100.0 / a.getTotalQuestions())
+                .average()
+                .orElse(0.0);
+
+        double passRate = totalAttempts > 0
+                ? passedAttempts * 100.0 / totalAttempts
+                : 0.0;
+
+        TeacherDashboardStats stats = new TeacherDashboardStats(
+                totalQuizzes,
+                publishedQuizzes,
+                draftQuizzes,
+                totalAttempts,
+                uniqueStudents,
+                passedAttempts,
+                failedAttempts,
+                averageScore,
+                passRate
+        );
+
+        // 4. Group attempts by quiz.
+        Map<Long, List<QuizAttempt>> attemptsByQuiz
+                = allAttempts.stream()
+                        .collect(Collectors.groupingBy(
+                                a -> a.getQuiz().getId()
+                        ));
+
+        // 5. Calculate statistics for each quiz.
+        Map<Long, TeacherQuizStats> quizStats = new HashMap<>();
+
+        for (Quiz quiz : teacherQuizzes) {
+
+            List<QuizAttempt> quizAttempts
+                    = attemptsByQuiz.getOrDefault(
+                            quiz.getId(),
+                            Collections.emptyList()
+                    );
+
+            long quizUniqueStudents = quizAttempts.stream()
+                    .map(a -> a.getStudent().getUsername())
+                    .distinct()
+                    .count();
+
+            double quizAverage = quizAttempts.stream()
+                    .filter(a -> a.getTotalQuestions() > 0)
+                    .mapToDouble(a
+                            -> a.getScore() * 100.0 / a.getTotalQuestions())
+                    .average()
+                    .orElse(0.0);
+
+            long quizPassed = quizAttempts.stream()
+                    .filter(a -> a.getTotalQuestions() > 0
+                            && a.getScore() * 100.0 / a.getTotalQuestions()
+                            >= PASS_PERCENTAGE)
+                    .count();
+
+            double quizPassRate = quizAttempts.isEmpty()
+                    ? 0.0
+                    : quizPassed * 100.0 / quizAttempts.size();
+
+            quizStats.put(
+                    quiz.getId(),
+                    new TeacherQuizStats(
+                            quizAttempts.size(),
+                            quizUniqueStudents,
+                            quizAverage,
+                            quizPassRate
+                    )
+            );
+        }
+
+        // 6. Add everything to the model.
+        model.addAttribute("quizzes", teacherQuizzes);
+        model.addAttribute("stats", stats);
+        model.addAttribute("quizStats", quizStats);
+        model.addAttribute("passPercentage", PASS_PERCENTAGE);
+
+        // 7. Five most recent student submissions.
+        model.addAttribute(
+                "recentAttempts",
+                allAttempts.stream().limit(5).toList()
+        );
+
         return "teacher/dashboard";
     }
 

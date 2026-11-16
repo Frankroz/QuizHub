@@ -293,4 +293,119 @@
   }
 }
 
+
+/* Teacher dashboard */
+.teacher-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 30px;
+}
+
+.teacher-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.activity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+}
+
+.activity-info {
+  flex: 1;
+  min-width: 180px;
+}
+
+.activity-info h3 {
+  margin: 0 0 7px;
+}
+
+.activity-info p {
+  margin: 4px 0;
+  font-size: 0.85rem;
+}
+
+.activity-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.activity-result > strong {
+  font-size: 1.2rem;
+}
+
+/* Per-quiz statistics */
+.quiz-analytics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+  padding: 15px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+}
+
+.quiz-analytics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.quiz-analytics span {
+  color: var(--muted, #6b7280);
+  font-size: 0.8rem;
+}
+
+.quiz-analytics strong {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.quiz-card form {
+  margin-bottom: 10px;
+}
+
+.quiz-card > .published {
+  display: block;
+  margin: 12px 0;
+}
+
+@media (max-width: 900px) {
+  .teacher-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .teacher-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .activity-row {
+    align-items: flex-start;
+  }
+
+  .activity-result {
+    align-items: flex-start;
+  }
+
+  .quiz-analytics {
+    gap: 10px;
+  }
+}
+
+
 @media(max-width:760px){.nav{height:auto;min-height:70px;padding:16px 20px;align-items:flex-start;gap:12px}.nav nav{gap:10px;flex-wrap:wrap;justify-content:flex-end}.feature-grid,.quiz-grid{grid-template-columns:1fr}.hero,.page{padding:42px 18px}.pagehead{align-items:flex-start;flex-direction:column}.pagehead h1{font-size:2.3rem}.options{grid-template-columns:1fr}.form-footer,.history-row{align-items:flex-start;flex-direction:column}.searchbar{flex-wrap:wrap}.searchbar input{flex-basis:100%}}

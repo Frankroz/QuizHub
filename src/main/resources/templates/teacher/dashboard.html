@@ -3,55 +3,273 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Teacher dashboard · QuizHub</title>
+    <title>Teacher Dashboard · QuizHub</title>
     <link rel="stylesheet" href="/css/app.css" />
   </head>
+
   <body>
     <div th:replace="~{fragments :: nav}"></div>
+
     <main class="page">
       <div th:replace="~{fragments :: messages}"></div>
+
+      <!-- Header -->
       <div class="pagehead">
         <div>
           <span class="eyebrow">TEACHER SPACE</span>
-          <h1>Your quizzes</h1>
-          <p>Create a quiz, then publish it when all 10 questions are ready.</p>
+          <h1>Your teaching overview</h1>
+          <p>Monitor student performance and manage your quizzes.</p>
         </div>
-        <a class="btn" href="/teacher/quizzes/new">＋ Create quiz</a>
+
+        <a class="btn" href="/teacher/quizzes/new"> ＋ Create quiz </a>
       </div>
-      <div th:if="${#lists.isEmpty(quizzes)}" class="empty">
-        <h3>Your first quiz starts here.</h3>
-        <p>Create a quiz with 10 questions and explanations.</p>
-      </div>
-      <div class="quiz-grid">
-        <article class="quiz-card" th:each="q : ${quizzes}">
-          <div class="cardtop">
-            <span class="tag" th:text="${q.subject}"></span
-            ><span class="status" th:text="${q.status}"></span>
-          </div>
-          <h3 th:text="${q.title}"></h3>
-          <p th:text="${q.description}"></p>
-          <p
-            class="muted"
-            th:text="${#lists.size(q.questions)} + ' question(s)'"
-          ></p>
-          <form
-            th:if="${q.status == 'DRAFT'}"
-            th:action="@{/teacher/quizzes/{id}/publish(id=${q.id})}"
-            method="post"
-          >
-            <button class="btn small" type="submit">Publish quiz</button>
-          </form>
-          <span th:if="${q.status == 'PUBLISHED'}" class="published"
-            >Visible to students ✓</span
-          >
-          <a
-            class="btn small"
-            th:href="@{/teacher/quizzes/{id}/results(id=${q.id})}"
-          >
-            View Results →
-          </a>
+
+      <!-- Main statistics -->
+      <section class="teacher-stats">
+        <article class="stat-card">
+          <span class="stat-label">Total quizzes</span>
+          <strong class="stat-value" th:text="${stats.totalQuizzes}">0</strong>
+          <span class="stat-description">Quizzes you created</span>
         </article>
-      </div>
+
+        <article class="stat-card">
+          <span class="stat-label">Published quizzes</span>
+          <strong class="stat-value" th:text="${stats.publishedQuizzes}"
+            >0</strong
+          >
+          <span class="stat-description">Available to students</span>
+        </article>
+
+        <article class="stat-card">
+          <span class="stat-label">Total attempts</span>
+          <strong class="stat-value" th:text="${stats.totalAttempts}">0</strong>
+          <span class="stat-description">Student submissions</span>
+        </article>
+
+        <article class="stat-card">
+          <span class="stat-label">Unique students</span>
+          <strong class="stat-value" th:text="${stats.uniqueStudents}"
+            >0</strong
+          >
+          <span class="stat-description">Students who participated</span>
+        </article>
+
+        <article class="stat-card">
+          <span class="stat-label">Average score</span>
+          <strong
+            class="stat-value"
+            th:text="${#numbers.formatDecimal(stats.averageScore, 1, 1)} + '%'"
+          >
+            0%
+          </strong>
+          <span class="stat-description">Across all submissions</span>
+        </article>
+
+        <article class="stat-card">
+          <span class="stat-label">Draft quizzes</span>
+          <strong class="stat-value" th:text="${stats.draftQuizzes}">0</strong>
+          <span class="stat-description">Waiting to be published</span>
+        </article>
+      </section>
+
+      <!-- Performance overview -->
+      <section class="dashboard-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">STUDENT PERFORMANCE</span>
+            <h2>Overall pass rate</h2>
+            <p class="muted">Passing score: 60% or higher</p>
+          </div>
+
+          <strong
+            class="performance-percentage"
+            th:text="${#numbers.formatDecimal(stats.passRate, 1, 1)} + '%'"
+          >
+            0%
+          </strong>
+        </div>
+
+        <div class="performance-card">
+          <div class="progress-track">
+            <div
+              class="progress-fill"
+              th:style="'width:' + ${stats.passRate} + '%'"
+            ></div>
+          </div>
+
+          <div class="performance-legend">
+            <span>
+              <span class="legend-dot passed-dot"></span>
+              Passed:
+              <strong th:text="${stats.passedAttempts}">0</strong>
+            </span>
+
+            <span>
+              <span class="legend-dot failed-dot"></span>
+              Failed:
+              <strong th:text="${stats.failedAttempts}">0</strong>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recent submissions -->
+      <section class="dashboard-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">LATEST ACTIVITY</span>
+            <h2>Recent student submissions</h2>
+          </div>
+        </div>
+
+        <div th:if="${#lists.isEmpty(recentAttempts)}" class="empty">
+          <h3>No submissions yet</h3>
+          <p>
+            Student submissions will appear here when someone completes one of
+            your quizzes.
+          </p>
+        </div>
+
+        <div
+          class="teacher-activity"
+          th:unless="${#lists.isEmpty(recentAttempts)}"
+        >
+          <article class="activity-row" th:each="a : ${recentAttempts}">
+            <div class="activity-info">
+              <h3 th:text="${a.quiz.title}">Quiz title</h3>
+              <p class="muted">
+                Student:
+                <strong th:text="${a.student.username}">Student</strong>
+              </p>
+              <p
+                class="muted"
+                th:text="${a.submittedAt != null
+                   ? #temporals.format(a.submittedAt, 'MMM dd, yyyy HH:mm')
+                   : 'Date unavailable'}"
+              >
+                Submission date
+              </p>
+            </div>
+
+            <div class="activity-result">
+              <strong th:text="${a.score} + '/' + ${a.totalQuestions}">
+                0/10
+              </strong>
+
+              <span
+                class="result-status"
+                th:classappend="${a.totalQuestions > 0
+                      and a.score * 100.0 / a.totalQuestions >= 60
+                      ? ' passed' : ' failed'}"
+                th:text="${a.totalQuestions > 0
+                      and a.score * 100.0 / a.totalQuestions >= 60
+                      ? 'PASSED' : 'FAILED'}"
+              >
+                PASSED
+              </span>
+            </div>
+
+            <a
+              class="btn small secondary"
+              th:href="@{/teacher/quizzes/{id}/results(id=${a.quiz.id})}"
+            >
+              Quiz results
+            </a>
+          </article>
+        </div>
+      </section>
+
+      <!-- Quiz management -->
+      <section class="dashboard-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">QUIZ MANAGEMENT</span>
+            <h2>Your quizzes</h2>
+            <p>
+              Create a quiz, then publish it when all 10 questions are ready.
+            </p>
+          </div>
+
+          <a class="btn" href="/teacher/quizzes/new"> ＋ Create quiz </a>
+        </div>
+
+        <div th:if="${#lists.isEmpty(quizzes)}" class="empty">
+          <h3>Your first quiz starts here.</h3>
+          <p>Create a quiz with 10 questions and explanations.</p>
+        </div>
+
+        <div class="quiz-grid">
+          <article class="quiz-card" th:each="q : ${quizzes}">
+            <div class="cardtop">
+              <span class="tag" th:text="${q.subject}"></span>
+              <span class="status" th:text="${q.status}"></span>
+            </div>
+
+            <h3 th:text="${q.title}">Quiz title</h3>
+            <p th:text="${q.description}"></p>
+
+            <p
+              class="muted"
+              th:text="${#lists.size(q.questions)} + ' question(s)'"
+            >
+              10 questions
+            </p>
+
+            <!-- Quiz analytics -->
+            <div class="quiz-analytics">
+              <div>
+                <span>Attempts</span>
+                <strong th:text="${quizStats[q.id].attempts}">0</strong>
+              </div>
+
+              <div>
+                <span>Students</span>
+                <strong th:text="${quizStats[q.id].uniqueStudents}">0</strong>
+              </div>
+
+              <div>
+                <span>Average</span>
+                <strong
+                  th:text="${#numbers.formatDecimal(
+                  quizStats[q.id].averageScore, 1, 1)} + '%'"
+                >
+                  0%
+                </strong>
+              </div>
+
+              <div>
+                <span>Pass rate</span>
+                <strong
+                  th:text="${#numbers.formatDecimal(
+                  quizStats[q.id].passRate, 1, 1)} + '%'"
+                >
+                  0%
+                </strong>
+              </div>
+            </div>
+
+            <!-- Publishing -->
+            <form
+              th:if="${q.status == 'DRAFT'}"
+              th:action="@{/teacher/quizzes/{id}/publish(id=${q.id})}"
+              method="post"
+            >
+              <button class="btn small" type="submit">Publish quiz</button>
+            </form>
+
+            <span th:if="${q.status == 'PUBLISHED'}" class="published">
+              Visible to students ✓
+            </span>
+
+            <a
+              class="btn small"
+              th:href="@{/teacher/quizzes/{id}/results(id=${q.id})}"
+            >
+              View Results →
+            </a>
+          </article>
+        </div>
+      </section>
     </main>
   </body>
 </html>
