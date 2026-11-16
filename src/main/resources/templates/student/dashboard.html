@@ -3,67 +3,242 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Find quizzes · QuizHub</title>
+    <title>Student Dashboard · QuizHub</title>
     <link rel="stylesheet" href="/css/app.css" />
   </head>
+
   <body>
     <div th:replace="~{fragments :: nav}"></div>
+
     <main class="page">
       <div th:replace="~{fragments :: messages}"></div>
+
+      <!-- Dashboard heading -->
       <div class="pagehead">
         <div>
           <span class="eyebrow">STUDENT SPACE</span>
-          <h1>Find your next challenge</h1>
-          <p>Search by subject and test what you know.</p>
+          <h1>Welcome back!</h1>
+          <p>Track your progress and discover your next challenge.</p>
         </div>
       </div>
-      <form method="get" action="/student" class="searchbar">
-        <input
-          name="subject"
-          th:value="${subject}"
-          placeholder="Search subjects, e.g. Biology"
-        /><button class="btn" type="submit">Search</button
-        ><a class="btn secondary" href="/student">Clear</a>
-      </form>
-      <div th:if="${#lists.isEmpty(quizzes)}" class="empty">
-        <h3>No quizzes found</h3>
-        <p>Try a different subject, or check back later.</p>
-      </div>
-      <div class="quiz-grid">
-        <article class="quiz-card" th:each="q : ${quizzes}">
-          <span class="tag" th:text="${q.subject}"></span>
-          <h3 th:text="${q.title}"></h3>
-          <p th:text="${q.description}"></p>
-          <p class="muted">
-            Created by
-            <strong th:text="${q.teacher.username}">Teacher</strong>
-          </p>
 
-          <p class="muted">
-            Attempts used:
-            <strong th:text="${attemptsUsed[q.id] ?: 0}">0</strong>
-            / 3
-          </p>
-
-          <a
-            class="btn small"
-            th:if="${attemptsUsed[q.id] == null or attemptsUsed[q.id] < 3}"
-            th:href="@{/student/quizzes/{id}(id=${q.id})}"
+      <!-- Statistics -->
+      <section class="dashboard-stats">
+        <article class="stat-card">
+          <span class="stat-label">Quizzes completed</span>
+          <strong class="stat-value" th:text="${stats.quizzesCompleted}"
+            >0</strong
           >
-            View and start →
-          </a>
-
-          <span
-            class="btn small secondary"
-            th:if="${attemptsUsed[q.id] != null and attemptsUsed[q.id] >= 3}"
-          >
-            Maximum attempts reached
-          </span>
+          <span class="stat-description">Unique quizzes attempted</span>
         </article>
-      </div>
-      <p class="muted footerlink">
-        <a href="/student/history">View your previous results →</a>
-      </p>
+
+        <article class="stat-card">
+          <span class="stat-label">Total attempts</span>
+          <strong class="stat-value" th:text="${stats.totalAttempts}">0</strong>
+          <span class="stat-description">All your submissions</span>
+        </article>
+
+        <article class="stat-card">
+          <span class="stat-label">Average score</span>
+          <strong
+            class="stat-value"
+            th:text="${#numbers.formatDecimal(stats.averageScore, 1, 1)} + '%'"
+          >
+            0%
+          </strong>
+          <span class="stat-description">Across all attempts</span>
+        </article>
+
+        <article class="stat-card">
+          <span class="stat-label">Best score</span>
+          <strong
+            class="stat-value"
+            th:text="${#numbers.formatDecimal(stats.bestScore, 1, 1)} + '%'"
+          >
+            0%
+          </strong>
+          <span class="stat-description">Your highest result</span>
+        </article>
+      </section>
+
+      <!-- Performance overview -->
+      <section class="dashboard-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">YOUR PERFORMANCE</span>
+            <h2>Progress overview</h2>
+          </div>
+        </div>
+
+        <div class="performance-card">
+          <div class="performance-header">
+            <div>
+              <h3>Pass rate</h3>
+              <p class="muted">Based on your submitted attempts</p>
+            </div>
+
+            <strong
+              class="performance-percentage"
+              th:text="${#numbers.formatDecimal(stats.passRate, 1, 1)} + '%'"
+            >
+              0%
+            </strong>
+          </div>
+
+          <div class="progress-track">
+            <div
+              class="progress-fill"
+              th:style="'width:' + ${stats.passRate} + '%'"
+            ></div>
+          </div>
+
+          <div class="performance-legend">
+            <span>
+              <span class="legend-dot passed-dot"></span>
+              Passed:
+              <strong th:text="${stats.passedAttempts}">0</strong>
+            </span>
+
+            <span>
+              <span class="legend-dot failed-dot"></span>
+              Failed:
+              <strong th:text="${stats.failedAttempts}">0</strong>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recent activity -->
+      <section class="dashboard-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">RECENT ACTIVITY</span>
+            <h2>Your latest attempts</h2>
+          </div>
+
+          <a class="text-link" href="/student/history"> View all results → </a>
+        </div>
+
+        <div th:if="${#lists.isEmpty(recentAttempts)}" class="empty">
+          <h3>Your journey starts here!</h3>
+          <p>Complete your first quiz to see your progress.</p>
+        </div>
+
+        <div
+          class="recent-attempts"
+          th:unless="${#lists.isEmpty(recentAttempts)}"
+        >
+          <article class="recent-attempt" th:each="a : ${recentAttempts}">
+            <div class="recent-attempt-info">
+              <h3 th:text="${a.quiz.title}">Quiz title</h3>
+
+              <p class="muted">
+                <span th:text="${a.quiz.subject}">Subject</span>
+                <span> · </span>
+                <span
+                  th:text="${a.submittedAt != null
+                  ? #temporals.format(a.submittedAt, 'MMM dd, yyyy HH:mm')
+                  : 'Date unavailable'}"
+                >
+                  Date
+                </span>
+              </p>
+            </div>
+
+            <div class="recent-attempt-result">
+              <strong th:text="${a.score} + '/' + ${a.totalQuestions}">
+                0/10
+              </strong>
+
+              <span
+                class="result-status"
+                th:classappend="${a.totalQuestions > 0
+                      and a.score * 100.0 / a.totalQuestions >= 60
+                      ? ' passed' : ' failed'}"
+                th:text="${a.totalQuestions > 0
+                      and a.score * 100.0 / a.totalQuestions >= 60
+                      ? 'PASSED' : 'FAILED'}"
+              >
+                PASSED
+              </span>
+            </div>
+
+            <a
+              class="btn small secondary"
+              th:href="@{/student/attempts/{attemptId}/review(
+                 attemptId=${a.id})}"
+            >
+              Review
+            </a>
+          </article>
+        </div>
+      </section>
+
+      <!-- Quiz search -->
+      <section class="dashboard-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">KEEP LEARNING</span>
+            <h2>Find your next challenge</h2>
+            <p>Search by subject and test what you know.</p>
+          </div>
+        </div>
+
+        <form method="get" action="/student" class="searchbar">
+          <input
+            name="subject"
+            th:value="${subject}"
+            placeholder="Search subjects, e.g. Biology"
+          />
+
+          <button class="btn" type="submit">Search</button>
+
+          <a class="btn secondary" href="/student">Clear</a>
+        </form>
+
+        <div th:if="${#lists.isEmpty(quizzes)}" class="empty">
+          <h3>No quizzes found</h3>
+          <p>Try a different subject, or check back later.</p>
+        </div>
+
+        <div class="quiz-grid">
+          <article class="quiz-card" th:each="q : ${quizzes}">
+            <span class="tag" th:text="${q.subject}"></span>
+
+            <h3 th:text="${q.title}">Quiz title</h3>
+
+            <p th:text="${q.description}"></p>
+
+            <p class="muted">
+              Created by
+              <strong th:text="${q.teacher.username}">Teacher</strong>
+            </p>
+
+            <p class="muted">
+              Attempts used:
+              <strong th:text="${attemptsUsed[q.id] ?: 0}">0</strong>
+              / 3
+            </p>
+
+            <a
+              class="btn small"
+              th:if="${attemptsUsed[q.id] == null
+                or attemptsUsed[q.id] < 3}"
+              th:href="@{/student/quizzes/{id}(id=${q.id})}"
+            >
+              View and start →
+            </a>
+
+            <span
+              class="btn small secondary"
+              th:if="${attemptsUsed[q.id] != null
+                and attemptsUsed[q.id] >= 3}"
+            >
+              Maximum attempts reached
+            </span>
+          </article>
+        </div>
+      </section>
     </main>
   </body>
 </html>

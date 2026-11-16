@@ -25,6 +25,7 @@ import com.quizapp.attempt.QuizAttemptRepository;
 import com.quizapp.quiz.Question;
 import com.quizapp.quiz.Quiz;
 import com.quizapp.quiz.QuizRepository;
+import com.quizapp.quiz.StudentDashboardStats;
 import com.quizapp.quiz.StudentQuizResult;
 import com.quizapp.user.User;
 import com.quizapp.user.UserRepository;
@@ -304,6 +305,63 @@ public class WebController {
             attemptsUsed.put(quiz.getId(), count);
         }
 
+        // Get all attempts belonging to the logged-in student.
+        List<QuizAttempt> studentAttempts
+                = attempts.findByStudentUsernameOrderBySubmittedAtDesc(
+                        auth.getName()
+                );
+
+        final int PASS_PERCENTAGE = 60;
+
+        // Calculate statistics.
+        long totalAttempts = studentAttempts.size();
+
+        long quizzesCompleted = studentAttempts.stream()
+                .map(a -> a.getQuiz().getId())
+                .distinct()
+                .count();
+
+        long passedAttempts = studentAttempts.stream()
+                .filter(a -> a.getTotalQuestions() > 0
+                        && a.getScore() * 100.0 / a.getTotalQuestions()
+                        >= PASS_PERCENTAGE)
+                .count();
+
+        long failedAttempts = totalAttempts - passedAttempts;
+
+        double averageScore = studentAttempts.stream()
+                .filter(a -> a.getTotalQuestions() > 0)
+                .mapToDouble(a
+                        -> a.getScore() * 100.0 / a.getTotalQuestions())
+                .average()
+                .orElse(0.0);
+
+        double bestScore = studentAttempts.stream()
+                .filter(a -> a.getTotalQuestions() > 0)
+                .mapToDouble(a
+                        -> a.getScore() * 100.0 / a.getTotalQuestions())
+                .max()
+                .orElse(0.0);
+
+        double passRate = totalAttempts > 0
+                ? passedAttempts * 100.0 / totalAttempts
+                : 0.0;
+
+        StudentDashboardStats stats = new StudentDashboardStats(
+                quizzesCompleted,
+                totalAttempts,
+                passedAttempts,
+                failedAttempts,
+                averageScore,
+                passRate,
+                bestScore
+        );
+
+        model.addAttribute("stats", stats);
+        model.addAttribute(
+                "recentAttempts",
+                studentAttempts.stream().limit(5).toList()
+        );
         model.addAttribute("subject", subject);
         model.addAttribute("quizzes", quizList);
         model.addAttribute("attemptsUsed", attemptsUsed);
