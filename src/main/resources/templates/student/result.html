@@ -49,6 +49,16 @@
             >Incorrect</span
           >
         </div>
+        <div
+          class="question-image-container"
+          th:if="${q.imagePath != null and !q.imagePath.isEmpty()}"
+        >
+          <img
+            th:src="${q.imagePath}"
+            alt="Question image"
+            class="question-image"
+          />
+        </div>
         <h3 th:text="${q.questionText}"></h3>
         <p>
           Your answer:

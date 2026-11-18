@@ -106,6 +106,17 @@
             <span class="muted"> 1 point </span>
           </div>
 
+          <div
+            class="question-image-container"
+            th:if="${item.question.imagePath != null and !#strings.isEmpty(item.question.imagePath)}"
+          >
+            <img
+              th:src="@{${item.question.imagePath}}"
+              th:alt="|Image for question ${stat.count}|"
+              class="question-image"
+            />
+          </div>
+
           <h3 th:text="${item.question.questionText}"></h3>
 
           <!-- Options are displayed in shuffled order.

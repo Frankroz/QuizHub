@@ -15,11 +15,16 @@
       <a class="back" href="/teacher">← Back to dashboard</a>
       <span class="eyebrow">QUIZ BUILDER</span>
       <h1>Create a quiz</h1>
-      <p>Add between 1 and 10 questions. Your quiz will be saved as a draft.</p>
+
+      <p>
+        Add between 1 and 10 questions. You can optionally include an image with
+        each question. Your quiz will be saved as a draft.
+      </p>
 
       <form
         id="quiz-form"
         method="post"
+        enctype="multipart/form-data"
         th:action="@{/teacher/quizzes}"
         class="stack"
       >
@@ -58,6 +63,41 @@
               <textarea name="q__INDEX__" required rows="2"></textarea>
             </label>
 
+            <!-- Optional image upload -->
+
+            <div class="question-image-upload">
+              <label>
+                <span class="upload-label-icon">
+                  <i class="icon-image"></i>
+                </span>
+
+                <span>Question image</span>
+                <span class="muted">(Optional)</span>
+              </label>
+
+              <input
+                type="file"
+                name="questionImages"
+                accept="image/jpeg,image/png,image/webp"
+                class="question-image-input"
+              />
+
+              <small class="upload-hint">
+                Add an image to help illustrate your question. JPG, PNG or WebP
+                · Maximum 5 MB.
+              </small>
+
+              <div class="image-preview" hidden>
+                <img
+                  class="question-image-preview"
+                  alt="Question image preview"
+                />
+
+                <span class="image-preview-name"></span>
+              </div>
+            </div>
+
+            <!-- Answer options -->
             <div class="options">
               <label
                 >Option A
@@ -132,6 +172,8 @@
     <script>
       document.addEventListener("DOMContentLoaded", () => {
         const MAX_QUESTIONS = 10;
+        const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+        const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
         const questionList = document.getElementById("question-list");
         const questionTemplate = document.getElementById("question-template");
@@ -182,6 +224,72 @@
           renumberQuestions();
         }
 
+        function clearPreview(card) {
+          const input = card.querySelector(".question-image-input");
+          const preview = card.querySelector(".image-preview");
+          const image = card.querySelector(".question-image-preview");
+          const filename = card.querySelector(".image-preview-name");
+
+          if (image.dataset.objectUrl) {
+            URL.revokeObjectURL(image.dataset.objectUrl);
+            delete image.dataset.objectUrl;
+          }
+
+          input.value = "";
+          image.removeAttribute("src");
+          filename.textContent = "";
+          preview.hidden = true;
+        }
+
+        function previewImage(input) {
+          const card = input.closest(".question-block");
+
+          const preview = card.querySelector(".image-preview");
+          const image = card.querySelector(".question-image-preview");
+          const filename = card.querySelector(".image-preview-name");
+
+          if (image.dataset.objectUrl) {
+            URL.revokeObjectURL(image.dataset.objectUrl);
+            delete image.dataset.objectUrl;
+          }
+
+          const file = input.files?.[0];
+
+          if (!file) {
+            preview.hidden = true;
+            image.removeAttribute("src");
+            filename.textContent = "";
+            return;
+          }
+
+          if (!ALLOWED_TYPES.includes(file.type)) {
+            alert("Please select a JPG, PNG, or WebP image.");
+
+            input.value = "";
+            preview.hidden = true;
+
+            return;
+          }
+
+          if (file.size > MAX_IMAGE_SIZE) {
+            alert("The image must be 5 MB or smaller.");
+
+            input.value = "";
+            preview.hidden = true;
+
+            return;
+          }
+
+          const objectUrl = URL.createObjectURL(file);
+
+          image.src = objectUrl;
+          image.dataset.objectUrl = objectUrl;
+
+          filename.textContent = file.name;
+
+          preview.hidden = false;
+        }
+
         addButton.addEventListener("click", addQuestion);
 
         questionList.addEventListener("click", (event) => {
@@ -193,9 +301,22 @@
 
           const cards = questionList.querySelectorAll(".question-block");
 
-          if (cards.length > 1) {
-            removeButton.closest(".question-block").remove();
-            renumberQuestions();
+          if (cards.length <= 1) {
+            return;
+          }
+
+          const card = removeButton.closest(".question-block");
+
+          clearPreview(card);
+          card.remove();
+
+          renumberQuestions();
+        });
+
+        // Handle image selection for dynamically created questions.
+        questionList.addEventListener("change", (event) => {
+          if (event.target.matches(".question-image-input")) {
+            previewImage(event.target);
           }
         });
 

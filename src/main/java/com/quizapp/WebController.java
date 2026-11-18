@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -32,6 +33,7 @@ import com.quizapp.attempt.QuizQuestionView;
 import com.quizapp.attempt.QuizRandomizer;
 import com.quizapp.attempt.QuizRandomizer.RandomizedQuiz;
 import com.quizapp.quiz.Question;
+import com.quizapp.quiz.QuestionImageService;
 import com.quizapp.quiz.Quiz;
 import com.quizapp.quiz.QuizRepository;
 import com.quizapp.quiz.StudentDashboardStats;
@@ -51,14 +53,16 @@ public class WebController {
     private final QuizAttemptRepository attempts;
     private final AttemptAnswerRepository answers;
     private final PasswordEncoder encoder;
+    private final QuestionImageService questionImageService;
 
     public WebController(UserRepository users, QuizRepository quizzes, QuizAttemptRepository attempts,
-            AttemptAnswerRepository answers, PasswordEncoder encoder) {
+            AttemptAnswerRepository answers, PasswordEncoder encoder, QuestionImageService questionImageService) {
         this.users = users;
         this.quizzes = quizzes;
         this.attempts = attempts;
         this.answers = answers;
         this.encoder = encoder;
+        this.questionImageService = questionImageService;
     }
 
     @GetMapping("/")
@@ -242,6 +246,7 @@ public class WebController {
     }
 
     @PostMapping("/teacher/quizzes")
+    @Transactional
     public String createQuiz(
             Authentication auth,
             @RequestParam String title,
@@ -249,6 +254,7 @@ public class WebController {
             @RequestParam String description,
             @RequestParam(defaultValue = "1") int questionCount,
             @RequestParam Map<String, String> form,
+            @RequestParam(name = "questionImages", required = false) List<MultipartFile> questionImages,
             RedirectAttributes ra) {
 
         title = title.trim();
@@ -270,8 +276,16 @@ public class WebController {
             return "redirect:/teacher/quizzes/new";
         }
 
-        User teacher = users.findByUsername(auth.getName()).orElseThrow();
-        Quiz quiz = new Quiz(title, subject, description, teacher);
+        // Make sure the image list corresponds to the submitted question count.
+        if (questionImages != null && questionImages.size() != questionCount) {
+            ra.addFlashAttribute("error",
+                    "The uploaded images do not match the submitted questions.");
+
+            return "redirect:/teacher/quizzes/new";
+        }
+
+        // Validate all questions before saving any images.
+        List<Question> newQuestions = new ArrayList<>();
 
         for (int i = 1; i <= questionCount; i++) {
             String text = form.get("q" + i);
@@ -292,7 +306,7 @@ public class WebController {
                 return "redirect:/teacher/quizzes/new";
             }
 
-            quiz.addQuestion(new Question(
+            newQuestions.add(new Question(
                     text.trim(),
                     a.trim(),
                     b.trim(),
@@ -300,10 +314,60 @@ public class WebController {
                     d.trim(),
                     correct,
                     explanation.trim(),
-                    i));
+                    i
+            ));
         }
 
-        quizzes.save(quiz);
+        User teacher = users.findByUsername(auth.getName()).orElseThrow();
+
+        Quiz quiz = new Quiz(title, subject, description, teacher);
+
+        List<String> savedImagePaths = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < newQuestions.size(); i++) {
+
+                Question question = newQuestions.get(i);
+
+                MultipartFile image = questionImages != null
+                        && questionImages.size() > i
+                        ? questionImages.get(i)
+                        : null;
+
+                System.out.println("Processing question " + (i + 1));
+
+                if (image != null && !image.isEmpty()) {
+                    System.out.println("Saving image: " + image.getOriginalFilename());
+                    String imagePath = questionImageService.save(image);
+
+                    question.setImagePath(imagePath);
+                    savedImagePaths.add(imagePath);
+                    System.out.println("Saved image path: " + imagePath);
+                } else {
+                    System.out.println("No image for question " + (i + 1));
+                }
+
+                quiz.addQuestion(question);
+            }
+
+            quizzes.save(quiz);
+
+        } catch (IllegalArgumentException e) {
+
+            // Clean up files if validation fails.
+            savedImagePaths.forEach(questionImageService::delete);
+
+            ra.addFlashAttribute("error", e.getMessage());
+
+            return "redirect:/teacher/quizzes/new";
+
+        } catch (RuntimeException e) {
+
+            // Avoid leaving uploaded files behind if database persistence fails.
+            savedImagePaths.forEach(questionImageService::delete);
+
+            throw e;
+        }
 
         ra.addFlashAttribute("message",
                 "Draft saved with " + questionCount + " question(s).");
@@ -528,7 +592,7 @@ public class WebController {
         }
 
         // Keep the assignment requirement: exactly 10 questions.
-        if (quiz.getQuestions().size() != 10) {
+        if (quiz.getQuestions().isEmpty() || quiz.getQuestions().size() > 10) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "This quiz must contain exactly 10 questions."
@@ -642,7 +706,7 @@ public class WebController {
             ));
         }
 
-        if (randomizedQuestions.size() != 10) {
+        if (quiz.getQuestions().isEmpty() || quiz.getQuestions().size() > 10) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "This attempt does not contain 10 questions."
@@ -706,7 +770,7 @@ public class WebController {
                 ));
 
         if (!"PUBLISHED".equals(quiz.getStatus())
-                || quiz.getQuestions().size() != 10) {
+                || quiz.getQuestions().size() > 10) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "This quiz is no longer available."
@@ -731,8 +795,8 @@ public class WebController {
         Set<Long> expectedQuestionIds = questionsById.keySet();
         Set<Long> submittedQuestionIds = new HashSet<>(questionOrder);
 
-        if (questionOrder.size() != 10
-                || submittedQuestionIds.size() != 10
+        if (questionOrder.size() > 10
+                || submittedQuestionIds.size() > 10
                 || !submittedQuestionIds.equals(expectedQuestionIds)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,

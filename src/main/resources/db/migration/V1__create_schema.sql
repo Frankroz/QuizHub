@@ -79,6 +79,8 @@ CREATE TABLE questions (
     correct_option VARCHAR(1) NOT NULL,
     explanation TEXT NOT NULL,
 
+    image_path VARCHAR(500),
+
     question_order INT NOT NULL,
 
     CONSTRAINT fk_question_quiz

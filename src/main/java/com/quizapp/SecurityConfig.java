@@ -25,6 +25,7 @@ public class SecurityConfig {
                 .requestMatchers("/", "/register", "/login", "/css/**", "/error").permitAll()
                 .requestMatchers("/teacher/**").hasRole("TEACHER")
                 .requestMatchers("/student/**", "/attempt/**").hasRole("STUDENT")
+                .requestMatchers("/question-images/**").authenticated()
                 .anyRequest().authenticated())
             .formLogin(form -> form.loginPage("/login").defaultSuccessUrl("/", true).permitAll())
             .logout(logout -> logout.logoutSuccessUrl("/").permitAll());
