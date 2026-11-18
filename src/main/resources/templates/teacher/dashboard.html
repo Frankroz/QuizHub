@@ -11,6 +11,20 @@
     <div th:replace="~{fragments :: nav}"></div>
 
     <main class="page">
+      <div
+        th:if="${successMessage}"
+        class="alert alert-success"
+        role="alert"
+        th:text="${successMessage}"
+      ></div>
+
+      <div
+        th:if="${errorMessage}"
+        class="alert alert-danger"
+        role="alert"
+        th:text="${errorMessage}"
+      ></div>
+      
       <div th:replace="~{fragments :: messages}"></div>
 
       <!-- Header -->
@@ -248,14 +262,45 @@
               </div>
             </div>
 
-            <!-- Publishing -->
-            <form
-              th:if="${q.status == 'DRAFT'}"
-              th:action="@{/teacher/quizzes/{id}/publish(id=${q.id})}"
-              method="post"
-            >
-              <button class="btn small" type="submit">Publish quiz</button>
-            </form>
+            <div class="quiz-actions">
+              <!-- Publish a draft quiz -->
+              <form
+                th:if="${q.status == 'DRAFT'}"
+                th:action="@{/teacher/quizzes/{id}/publish(id=${q.id})}"
+                method="post"
+              >
+                <button type="submit" class="btn btn-primary">
+                  <i class="icon icon-upload"></i>
+                  Publish quiz
+                </button>
+              </form>
+
+              <!-- Unpublish a published quiz -->
+              <form
+                th:if="${q.status == 'PUBLISHED'}"
+                th:action="@{/teacher/quizzes/{id}/unpublish(id=${q.id})}"
+                method="post"
+                onsubmit="
+                  return confirm(
+                    'Are you sure you want to unpublish this quiz? Students will no longer be able to start new attempts.',
+                  );
+                "
+              >
+                <button type="submit" class="btn btn-warning">
+                  <i class="icon icon-eye-off"></i>
+                  Unpublish quiz
+                </button>
+              </form>
+
+              <!-- View quiz results -->
+              <a
+                th:if="${q.status == 'PUBLISHED'}"
+                th:href="@{/teacher/quizzes/{id}/results(id=${q.id})}"
+                class="btn btn-secondary"
+              >
+                View results
+              </a>
+            </div>
 
             <span th:if="${q.status == 'PUBLISHED'}" class="published">
               Visible to students ✓

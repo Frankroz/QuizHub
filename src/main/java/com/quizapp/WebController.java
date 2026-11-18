@@ -375,7 +375,11 @@ public class WebController {
     }
 
     @PostMapping("/teacher/quizzes/{id}/publish")
-    public String publish(@PathVariable Long id, Authentication auth, RedirectAttributes ra) {
+    public String publish(
+            @PathVariable Long id,
+            Authentication auth,
+            RedirectAttributes ra) {
+
         Quiz quiz = quizzes
                 .findByIdAndTeacherUsername(id, auth.getName())
                 .orElseThrow(() -> new ResponseStatusException(
@@ -394,6 +398,42 @@ public class WebController {
         quiz.publish();
         quizzes.save(quiz);
         ra.addFlashAttribute("message", "Quiz published and visible to students.");
+        return "redirect:/teacher";
+    }
+
+    @PostMapping("/teacher/quizzes/{id}/unpublish")
+    @Transactional
+    public String unpublishQuiz(
+            @PathVariable Long id,
+            Authentication auth,
+            RedirectAttributes ra) {
+
+        Quiz quiz = quizzes.findByIdAndTeacherUsername(
+                id,
+                auth.getName()
+        ).orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Quiz not found"
+        ));
+
+        if (!"PUBLISHED".equals(quiz.getStatus())) {
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "This quiz is not currently published."
+            );
+
+            return "redirect:/teacher";
+        }
+
+        quiz.unpublish();
+
+        quizzes.save(quiz);
+
+        ra.addFlashAttribute(
+                "successMessage",
+                "Quiz unpublished successfully. Students can no longer start new attempts."
+        );
+
         return "redirect:/teacher";
     }
 
@@ -584,7 +624,7 @@ public class WebController {
 
         Quiz quiz = quizzes.findWithQuestionsById(id).orElse(null);
 
-        if (quiz == null || !"PUBLISHED".equals(quiz.getStatus())) {
+        if (quiz == null) {
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
                     "Quiz not found"
@@ -619,6 +659,13 @@ public class WebController {
             }
 
         } else {
+            if (!"PUBLISHED".equals(quiz.getStatus())) {
+                throw new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Quiz not found"
+                );
+            }
+
             long used = attempts.countByStudent_UsernameAndQuiz_Id(
                     auth.getName(),
                     id
