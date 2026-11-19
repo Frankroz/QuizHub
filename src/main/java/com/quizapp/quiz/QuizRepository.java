@@ -23,4 +23,10 @@ public interface QuizRepository extends JpaRepository<Quiz, Long> {
 
     @EntityGraph(attributePaths = {"questions", "teacher"})
     Optional<Quiz> findWithQuestionsById(Long id);
+
+    @EntityGraph(attributePaths = {"teacher", "questions"})
+    List<Quiz> findByTeacherUsernameAndStatusNotOrderByIdDesc(
+            String username,
+            String status
+    );
 }

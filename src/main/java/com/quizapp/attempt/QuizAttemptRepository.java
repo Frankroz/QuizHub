@@ -29,4 +29,16 @@ public interface QuizAttemptRepository
     @EntityGraph(attributePaths = {"quiz", "quiz.questions", "student"})
     Optional<QuizAttempt> findByIdAndStudentUsernameAndQuiz_Id(
             Long attemptId, String username, Long quizId);
+
+    @EntityGraph(attributePaths = {"quiz", "student"})
+    List<QuizAttempt> findByQuizTeacherUsernameAndQuizStatusNotOrderBySubmittedAtDesc(
+            String username,
+            String status
+    );
+
+    @EntityGraph(attributePaths = {"quiz", "student"})
+    List<QuizAttempt> findByStudentUsernameAndQuizStatusNotOrderBySubmittedAtDesc(
+            String username,
+            String status
+    );
 }

@@ -46,9 +46,13 @@ public class Quiz {
     public User getTeacher() { return teacher; }
     public String getStatus() { return status; }
     public List<Question> getQuestions() { return questions; }
+    public boolean isDeleted() { return "DELETED".equals(this.status); }
+    public LocalDateTime getCreatedAt() { return createdAt; }
     public void publish() { status = "PUBLISHED"; }
     public void unpublish() { status = "DRAFT"; }
     public void setTitle(String title) { this.title = title; }
     public void setSubject(String subject) { this.subject = subject; }
     public void setDescription(String description) { this.description = description; }
+    public void delete() { this.status = "DELETED"; }
+    public void setQuestions(List<Question> questions) { this.questions = questions; }
 }

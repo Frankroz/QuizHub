@@ -52,7 +52,7 @@ CREATE TABLE quizzes (
         ON DELETE RESTRICT,
 
     CONSTRAINT chk_quiz_status
-        CHECK (status IN ('DRAFT', 'PUBLISHED')),
+        CHECK (status IN ('DRAFT', 'PUBLISHED', 'DELETED')),
 
     INDEX idx_quiz_subject_status (subject, status),
     INDEX idx_quiz_teacher (teacher_id)

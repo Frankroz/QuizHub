@@ -72,7 +72,7 @@ public final class QuizRandomizer {
         List<Long> result = new ArrayList<>();
 
         for (String id : value.split(",")) {
-            result.add(Long.parseLong(id));
+            result.add(Long.valueOf(id));
         }
 
         return result;

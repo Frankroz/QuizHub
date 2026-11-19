@@ -121,15 +121,18 @@ public class WebController {
 
         // 1. Get all quizzes belonging to this teacher.
         List<Quiz> teacherQuizzes
-                = quizzes.findByTeacherUsernameOrderByIdDesc(
-                        auth.getName()
+                = quizzes.findByTeacherUsernameAndStatusNotOrderByIdDesc(
+                        auth.getName(),
+                        "DELETED"
                 );
 
         // 2. Get all attempts for quizzes belonging to this teacher.
         List<QuizAttempt> allAttempts
-                = attempts.findByQuizTeacherUsernameOrderBySubmittedAtDesc(
-                        auth.getName()
-                );
+                = attempts.findByQuizTeacherUsernameAndQuizStatusNotOrderBySubmittedAtDesc(
+                        auth.getName(),
+                        "DELETED"
+                ).stream().filter(a -> "SUBMITTED".equals(a.getStatus()))
+                        .toList();
 
         // 3. Overall quiz statistics.
         long totalQuizzes = teacherQuizzes.size();
@@ -394,6 +397,14 @@ public class WebController {
             ra.addFlashAttribute("error", "Quiz not found or you do not own it.");
             return "redirect:/teacher";
         }
+        if ("DELETED".equals(quiz.getStatus())) {
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "Deleted quizzes cannot be published."
+            );
+
+            return "redirect:/teacher";
+        }
         if (!quiz.getStatus().equals("DRAFT")
                 || quiz.getQuestions().isEmpty()
                 || quiz.getQuestions().size() > 10) {
@@ -421,7 +432,14 @@ public class WebController {
                 HttpStatus.NOT_FOUND,
                 "Quiz not found"
         ));
+        if ("DELETED".equals(quiz.getStatus())) {
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "Deleted quizzes cannot be unpublished."
+            );
 
+            return "redirect:/teacher";
+        }
         if (!"PUBLISHED".equals(quiz.getStatus())) {
             ra.addFlashAttribute(
                     "errorMessage",
@@ -456,6 +474,15 @@ public class WebController {
         ).orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.NOT_FOUND, "Quiz not found"
         ));
+
+        if ("DELETED".equals(quiz.getStatus())) {
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "Deleted quizzes cannot be edited."
+            );
+
+            return "redirect:/teacher";
+        }
 
         boolean hasInProgressAttempts = attempts.findByQuiz_Id(id)
                 .stream()
@@ -534,6 +561,15 @@ public class WebController {
         ).orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.NOT_FOUND, "Quiz not found"
         ));
+
+        if ("DELETED".equals(quiz.getStatus())) {
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "Deleted quizzes cannot be edited."
+            );
+
+            return "redirect:/teacher";
+        }
 
         // --------------------------------------------------
         // 2. Helper for returning validation errors
@@ -842,9 +878,12 @@ public class WebController {
 
         // Get all attempts belonging to the logged-in student.
         List<QuizAttempt> studentAttempts
-                = attempts.findByStudentUsernameOrderBySubmittedAtDesc(
-                        auth.getName()
-                );
+                = attempts.findByStudentUsernameAndQuizStatusNotOrderBySubmittedAtDesc(
+                        auth.getName(),
+                        "DELETED"
+                ).stream()
+                        .filter(a -> "SUBMITTED".equals(a.getStatus()))
+                        .toList();
 
         final int PASS_PERCENTAGE = 60;
 
@@ -921,7 +960,14 @@ public class WebController {
                     "Quiz not found"
             );
         }
+        if ("DELETED".equals(quiz.getStatus())) {
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "Deleted quizzes cannot be taken."
+            );
 
+            return "redirect:/teacher";
+        }
         // Keep the assignment requirement: exactly 10 questions.
         if (quiz.getQuestions().isEmpty() || quiz.getQuestions().size() > 10) {
             throw new ResponseStatusException(
@@ -1106,7 +1152,14 @@ public class WebController {
                         HttpStatus.NOT_FOUND,
                         "Quiz not found."
                 ));
+        if ("DELETED".equals(quiz.getStatus())) {
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "Deleted quizzes cannot be submitted."
+            );
 
+            return "redirect:/teacher";
+        }
         if (!"PUBLISHED".equals(quiz.getStatus())
                 || quiz.getQuestions().size() > 10) {
             throw new ResponseStatusException(
@@ -1307,15 +1360,6 @@ public class WebController {
         return "student/result";
     }
 
-    private Map<Long, String> resultSelections(Long attemptId, Quiz quiz) {
-        // Fetch rows using the repository's derived method added below.
-        Map<Long, String> map = new HashMap<>();
-        for (AttemptAnswer a : answers.findByAttemptId(attemptId)) {
-            map.put(a.getQuestion().getId(), a.getSelectedOption());
-        }
-        return map;
-    }
-
     @GetMapping("/student/history")
     public String studentHistory(Authentication auth, Model model) {
         List<QuizAttempt> history
@@ -1329,5 +1373,66 @@ public class WebController {
 
     private boolean blank(String s) {
         return s == null || s.trim().isEmpty();
+    }
+
+    @PostMapping("/teacher/quizzes/{id}/delete")
+    @Transactional
+    public String deleteQuiz(
+            @PathVariable Long id,
+            Authentication auth,
+            RedirectAttributes ra) {
+
+        // 1. Find the quiz belonging to the logged-in teacher.
+        Quiz quiz = quizzes.findByIdAndTeacherUsername(
+                id,
+                auth.getName()
+        ).orElse(null);
+
+        if (quiz == null) {
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "Quiz not found or you do not have permission to delete it."
+            );
+
+            return "redirect:/teacher";
+        }
+
+        // 2. Prevent deleting a quiz that is already deleted.
+        if ("DELETED".equals(quiz.getStatus())) {
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "This quiz has already been deleted."
+            );
+
+            return "redirect:/teacher";
+        }
+
+        // 3. Do not delete while a student is taking the quiz.
+        boolean hasInProgressAttempts = attempts.findByQuiz_Id(id)
+                .stream()
+                .anyMatch(attempt
+                        -> "IN_PROGRESS".equals(attempt.getStatus()));
+
+        if (hasInProgressAttempts) {
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "This quiz cannot be deleted while a student has an active attempt."
+            );
+
+            return "redirect:/teacher";
+        }
+
+        // 4. Soft-delete the quiz.
+        quiz.delete();
+
+        // 5. Persist the status change.
+        quizzes.saveAndFlush(quiz);
+
+        ra.addFlashAttribute(
+                "successMessage",
+                "Quiz deleted successfully. Existing student results have been preserved."
+        );
+
+        return "redirect:/teacher";
     }
 }

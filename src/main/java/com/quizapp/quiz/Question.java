@@ -72,6 +72,10 @@ public class Question {
         this.questionOrder = order;
     }
 
+    public Quiz getQuiz() {
+        return this.quiz;
+    }
+
     void setQuiz(Quiz quiz) {
         this.quiz = quiz;
     }
