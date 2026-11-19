@@ -3,76 +3,166 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+
     <title>Your result · QuizHub</title>
-    <link rel="stylesheet" href="/css/app.css" />
+
+    <link rel="stylesheet" th:href="@{/css/app.css}" />
   </head>
+
   <body>
     <div th:replace="~{fragments :: nav}"></div>
+
     <main class="page narrow-wide">
       <span class="eyebrow">QUIZ COMPLETE</span>
-      <h1 th:text="${quiz.title}"></h1>
+
+      <h1 th:text="${quiz.title}">Quiz title</h1>
+
+      <!-- SCORE PANEL -->
+
       <section class="score-panel">
         <span
           class="score"
           th:text="${attempt.score} + '/' + ${attempt.totalQuestions}"
-        ></span>
+        >
+        </span>
 
         <span
           class="result-status"
-          th:classappend="${attempt.score * 100.0 / attempt.totalQuestions >= 70
-      ? ' passed'
-      : ' failed'}"
-          th:text="${attempt.score * 100.0 / attempt.totalQuestions >= 70
-      ? 'PASSED'
-      : 'FAILED'}"
-        ></span>
+          th:classappend="${attempt.score * 100.0 / attempt.totalQuestions >= 60
+                    ? ' passed'
+                    : ' failed'}"
+          th:text="${attempt.score * 100.0 / attempt.totalQuestions >= 60
+                    ? 'PASSED'
+                    : 'FAILED'}"
+        >
+        </span>
 
         <p
-          th:text="${attempt.score * 100.0 / attempt.totalQuestions >= 70
-      ? 'Great work — you passed the quiz!'
-      : 'You did not pass this time. Review the explanations below and keep practicing.'}"
+          th:text="${attempt.score * 100.0 / attempt.totalQuestions >= 60
+                    ? 'Great work — you passed the quiz!'
+                    : 'You did not pass this time. Review the explanations below and keep practicing.'}"
         ></p>
 
-        <a class="btn small" href="/student">Find another quiz</a>
+        <a class="btn small" th:href="@{/student}"> Find another quiz </a>
       </section>
+
+      <!-- ANSWER REVIEW -->
+
       <h2>Review your answers</h2>
-      <article class="review-card" th:each="q,stat : ${quiz.questions}">
-        <div class="review-heading">
-          <span class="tag" th:text="'Question ' + ${stat.count}"></span
-          ><span
-            th:if="${selectedByQuestion[q.id] == q.correctOption}"
-            class="correct"
-            >Correct ✓</span
-          ><span
-            th:unless="${selectedByQuestion[q.id] == q.correctOption}"
-            class="incorrect"
-            >Incorrect</span
-          >
-        </div>
-        <div
-          class="question-image-container"
-          th:if="${q.imagePath != null and !q.imagePath.isEmpty()}"
+
+      <article class="review-card" th:each="answer, stat : ${attemptAnswers}">
+        <!-- Resolve snapshot values, with fallback for old attempts -->
+
+        <th:block
+          th:with="
+                    q=${answer.question},
+                    questionText=${answer.questionTextSnapshot != null ? answer.questionTextSnapshot : q.questionText},
+                    optionA=${answer.optionASnapshot != null ? answer.optionASnapshot : q.optionA},
+                    optionB=${answer.optionBSnapshot != null ? answer.optionBSnapshot : q.optionB},
+                    optionC=${answer.optionCSnapshot != null ? answer.optionCSnapshot : q.optionC},
+                    optionD=${answer.optionDSnapshot != null ? answer.optionDSnapshot : q.optionD},
+                    correctOption=${answer.correctOptionSnapshot != null ? answer.correctOptionSnapshot : q.correctOption},
+                    explanation=${answer.explanationSnapshot != null ? answer.explanationSnapshot : q.explanation},
+                    imagePath=${answer.imagePathSnapshot != null ? answer.imagePathSnapshot : q.imagePath}
+                "
         >
-          <img
-            th:src="${q.imagePath}"
-            alt="Question image"
-            class="question-image"
-          />
-        </div>
-        <h3 th:text="${q.questionText}"></h3>
-        <p>
-          Your answer:
-          <strong
-            th:text="${selectedByQuestion[q.id] + '. ' + q.optionText(selectedByQuestion[q.id])}"
-          ></strong>
-        </p>
-        <p>
-          Correct answer:
-          <strong
-            th:text="${q.correctOption + '. ' + q.optionText(q.correctOption)}"
-          ></strong>
-        </p>
-        <p class="explanation" th:text="${q.explanation}"></p>
+          <!-- QUESTION HEADER -->
+
+          <div class="review-heading">
+            <span class="tag" th:text="'Question ' + ${stat.count}"> </span>
+
+            <span th:if="${answer.correct}" class="correct"> Correct ✓ </span>
+
+            <span th:unless="${answer.correct}" class="incorrect">
+              Incorrect
+            </span>
+          </div>
+
+          <!-- HISTORICAL IMAGE -->
+
+          <div
+            class="question-image-container"
+            th:if="${imagePath != null and !imagePath.isEmpty()}"
+          >
+            <img
+              th:src="${imagePath}"
+              alt="Question image"
+              class="question-image"
+            />
+          </div>
+
+          <!-- HISTORICAL QUESTION TEXT -->
+
+          <h3 th:text="${questionText}">Question text</h3>
+
+          <!-- YOUR ANSWER -->
+
+          <p>
+            Your answer:
+
+            <strong
+              th:if="${answer.selectedOption == 'A'}"
+              th:text="'A. ' + ${optionA}"
+            >
+            </strong>
+
+            <strong
+              th:if="${answer.selectedOption == 'B'}"
+              th:text="'B. ' + ${optionB}"
+            >
+            </strong>
+
+            <strong
+              th:if="${answer.selectedOption == 'C'}"
+              th:text="'C. ' + ${optionC}"
+            >
+            </strong>
+
+            <strong
+              th:if="${answer.selectedOption == 'D'}"
+              th:text="'D. ' + ${optionD}"
+            >
+            </strong>
+
+            <strong th:if="${answer.selectedOption == null}">
+              Not answered
+            </strong>
+          </p>
+
+          <!-- CORRECT ANSWER -->
+
+          <p>
+            Correct answer:
+
+            <strong
+              th:if="${correctOption == 'A'}"
+              th:text="'A. ' + ${optionA}"
+            >
+            </strong>
+
+            <strong
+              th:if="${correctOption == 'B'}"
+              th:text="'B. ' + ${optionB}"
+            >
+            </strong>
+
+            <strong
+              th:if="${correctOption == 'C'}"
+              th:text="'C. ' + ${optionC}"
+            >
+            </strong>
+
+            <strong
+              th:if="${correctOption == 'D'}"
+              th:text="'D. ' + ${optionD}"
+            >
+            </strong>
+          </p>
+
+          <!-- EXPLANATION -->
+
+          <p class="explanation" th:text="${explanation}"></p>
+        </th:block>
       </article>
     </main>
   </body>

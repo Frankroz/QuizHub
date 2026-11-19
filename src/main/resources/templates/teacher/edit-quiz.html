@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Edit Quiz | QuizHub</title>
+
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" th:href="@{/css/app.css}" />
+  </head>
+
+  <body>
+    <div class="container py-5">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="fw-bold">Edit Quiz</h1>
+          <p class="text-muted mb-0">Update quiz details and questions.</p>
+        </div>
+
+        <a th:href="@{/teacher}" class="btn btn-outline-secondary">
+          Back to dashboard
+        </a>
+      </div>
+
+      <div class="alert alert-info">
+        <strong>Important:</strong>
+        Editing a published quiz returns it to draft status. You must publish it
+        again when you finish.
+      </div>
+
+      <div
+        th:if="${errorMessage}"
+        class="alert alert-danger"
+        role="alert"
+        th:text="${errorMessage}"
+      ></div>
+
+      <div
+        th:if="${successMessage}"
+        class="alert alert-success"
+        role="alert"
+        th:text="${successMessage}"
+      ></div>
+
+      <form
+        th:action="@{/teacher/quizzes/{id}/edit(id=${quiz.id})}"
+        th:object="${form}"
+        method="post"
+        enctype="multipart/form-data"
+      >
+        <div class="card shadow-sm mb-4">
+          <div class="card-body p-4">
+            <h4 class="mb-3">Quiz information</h4>
+
+            <div class="mb-3">
+              <label class="form-label">Quiz title</label>
+              <input
+                type="text"
+                th:field="*{title}"
+                class="form-control"
+                required
+                maxlength="200"
+              />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Subject</label>
+              <input
+                type="text"
+                th:field="*{subject}"
+                class="form-control"
+                required
+                maxlength="150"
+              />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Description</label>
+              <textarea
+                th:field="*{description}"
+                class="form-control"
+                rows="4"
+                required
+              ></textarea>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="fw-bold mb-3">Questions</h3>
+
+        <div th:each="q, stat : *{questions}" class="card shadow-sm mb-4">
+          <div class="card-header bg-light py-3">
+            <strong th:text="'Question ' + ${stat.count}"> Question 1 </strong>
+          </div>
+
+          <div class="card-body p-4">
+            <input
+              type="hidden"
+              th:field="*{questions[__${stat.index}__].id}"
+            />
+
+            <div class="mb-3">
+              <label class="form-label">Question text</label>
+              <textarea
+                class="form-control"
+                rows="3"
+                required
+                th:field="*{questions[__${stat.index}__].questionText}"
+              ></textarea>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Option A</label>
+                <input
+                  class="form-control"
+                  required
+                  th:field="*{questions[__${stat.index}__].optionA}"
+                />
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Option B</label>
+                <input
+                  class="form-control"
+                  required
+                  th:field="*{questions[__${stat.index}__].optionB}"
+                />
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Option C</label>
+                <input
+                  class="form-control"
+                  required
+                  th:field="*{questions[__${stat.index}__].optionC}"
+                />
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Option D</label>
+                <input
+                  class="form-control"
+                  required
+                  th:field="*{questions[__${stat.index}__].optionD}"
+                />
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <label class="form-label">Correct answer</label>
+
+              <select
+                class="form-select"
+                required
+                th:field="*{questions[__${stat.index}__].correctOption}"
+              >
+                <option value="">Select correct answer</option>
+                <option value="A">Option A</option>
+                <option value="B">Option B</option>
+                <option value="C">Option C</option>
+                <option value="D">Option D</option>
+              </select>
+            </div>
+
+            <div class="mt-3">
+              <label class="form-label">Explanation</label>
+
+              <textarea
+                class="form-control"
+                rows="3"
+                required
+                th:field="*{questions[__${stat.index}__].explanation}"
+              ></textarea>
+            </div>
+
+            <div class="mt-3">
+              <label class="form-label">Question image</label>
+
+              <div
+                th:if="${q.imagePath != null and !q.imagePath.isEmpty()}"
+                class="mb-3"
+              >
+                <img
+                  th:src="${q.imagePath}"
+                  class="img-thumbnail"
+                  style="max-width: 240px; max-height: 180px"
+                  alt="Current question image"
+                />
+
+                <div class="form-check mt-2">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    th:field="*{questions[__${stat.index}__].removeImage}"
+                  />
+
+                  <label class="form-check-label"> Remove current image </label>
+                </div>
+              </div>
+
+              <input
+                type="file"
+                th:field="*{questions[__${stat.index}__].imageFile}"
+                class="form-control"
+                accept="image/jpeg,image/png,image/webp"
+              />
+
+              <small class="text-muted">
+                Leave empty to keep the current image. Upload a new image to
+                replace it. Maximum file size: 5 MB.
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-5">
+          <a th:href="@{/teacher}" class="btn btn-outline-secondary">
+            Cancel
+          </a>
+
+          <button
+            type="submit"
+            class="btn btn-primary btn-lg"
+            onclick="
+              return confirm(
+                'Save these changes? A published quiz will become a draft.',
+              );
+            "
+          >
+            Save changes
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>

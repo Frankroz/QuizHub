@@ -48,4 +48,7 @@ public class Quiz {
     public List<Question> getQuestions() { return questions; }
     public void publish() { status = "PUBLISHED"; }
     public void unpublish() { status = "DRAFT"; }
+    public void setTitle(String title) { this.title = title; }
+    public void setSubject(String subject) { this.subject = subject; }
+    public void setDescription(String description) { this.description = description; }
 }

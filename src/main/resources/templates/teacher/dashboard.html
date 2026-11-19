@@ -24,7 +24,7 @@
         role="alert"
         th:text="${errorMessage}"
       ></div>
-      
+
       <div th:replace="~{fragments :: messages}"></div>
 
       <!-- Header -->
@@ -263,7 +263,13 @@
             </div>
 
             <div class="quiz-actions">
-              <!-- Publish a draft quiz -->
+              <a
+                th:href="@{/teacher/quizzes/{id}/edit(id=${q.id})}"
+                class="btn btn-outline-primary"
+              >
+                Edit quiz
+              </a>
+              
               <form
                 th:if="${q.status == 'DRAFT'}"
                 th:action="@{/teacher/quizzes/{id}/publish(id=${q.id})}"

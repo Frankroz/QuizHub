@@ -134,4 +134,29 @@ public class Question {
                 "";
         };
     }
+
+    public void setQuestionText (String value) {
+        this.questionText = value;
+    }
+    public void setOptionA (String value) {
+        this.optionA = value;
+    }
+    public void setOptionB (String value) {
+        this.optionB = value;
+    }
+    public void setOptionC (String value) {
+        this.optionC = value;
+    }
+    public void setOptionD (String value) {
+        this.optionD = value;
+    }
+    public void setCorrectOption (String value) {
+        this.correctOption = value;
+    }
+    public void setExplanation (String value) {
+        this.explanation = value;
+    }
+    public void setQuestionOrder (int value) {
+        this.questionOrder = value;
+    }
 }

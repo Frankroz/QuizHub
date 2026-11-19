@@ -8,15 +8,19 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -33,8 +37,10 @@ import com.quizapp.attempt.QuizQuestionView;
 import com.quizapp.attempt.QuizRandomizer;
 import com.quizapp.attempt.QuizRandomizer.RandomizedQuiz;
 import com.quizapp.quiz.Question;
+import com.quizapp.quiz.QuestionEditForm;
 import com.quizapp.quiz.QuestionImageService;
 import com.quizapp.quiz.Quiz;
+import com.quizapp.quiz.QuizEditForm;
 import com.quizapp.quiz.QuizRepository;
 import com.quizapp.quiz.StudentDashboardStats;
 import com.quizapp.quiz.StudentQuizResult;
@@ -432,6 +438,291 @@ public class WebController {
         ra.addFlashAttribute(
                 "successMessage",
                 "Quiz unpublished successfully. Students can no longer start new attempts."
+        );
+
+        return "redirect:/teacher";
+    }
+
+    @GetMapping("/teacher/quizzes/{id}/edit")
+    @Transactional
+    public String editQuizForm(
+            @PathVariable Long id,
+            Authentication auth,
+            Model model,
+            RedirectAttributes ra) {
+
+        Quiz quiz = quizzes.findByIdAndTeacherUsername(
+                id, auth.getName()
+        ).orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND, "Quiz not found"
+        ));
+
+        boolean hasInProgressAttempts = attempts.findByQuiz_Id(id)
+                .stream()
+                .anyMatch(attempt
+                        -> "IN_PROGRESS".equals(attempt.getStatus()));
+
+        if (hasInProgressAttempts) {
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "This quiz cannot be edited while a student has an active attempt."
+            );
+
+            return "redirect:/teacher";
+        }
+
+        QuizEditForm form = new QuizEditForm();
+
+        form.setTitle(quiz.getTitle());
+        form.setSubject(quiz.getSubject());
+        form.setDescription(quiz.getDescription());
+
+        List<QuestionEditForm> questionForms = quiz.getQuestions()
+                .stream()
+                .sorted(Comparator.comparing(
+                        Question::getQuestionOrder,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ))
+                .map(question -> {
+
+                    QuestionEditForm q = new QuestionEditForm();
+
+                    q.setId(question.getId());
+
+                    q.setQuestionText(question.getQuestionText());
+
+                    q.setOptionA(question.getOptionA());
+                    q.setOptionB(question.getOptionB());
+                    q.setOptionC(question.getOptionC());
+                    q.setOptionD(question.getOptionD());
+
+                    q.setCorrectOption(question.getCorrectOption());
+                    q.setExplanation(question.getExplanation());
+
+                    q.setImagePath(question.getImagePath());
+
+                    return q;
+                })
+                .toList();
+
+        form.setQuestions(questionForms);
+
+        model.addAttribute("quiz", quiz);
+        model.addAttribute("form", form);
+
+        return "teacher/edit-quiz";
+    }
+
+    @PostMapping(
+            value = "/teacher/quizzes/{id}/edit",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    @Transactional
+    public String updateQuiz(
+            @PathVariable Long id,
+            @ModelAttribute("form") QuizEditForm form,
+            BindingResult bindingResult,
+            Authentication auth,
+            Model model,
+            RedirectAttributes ra) {
+
+        // --------------------------------------------------
+        // 1. Load the quiz belonging to the authenticated teacher
+        // --------------------------------------------------
+        Quiz quiz = quizzes.findByIdAndTeacherUsername(
+                id, auth.getName()
+        ).orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND, "Quiz not found"
+        ));
+
+        // --------------------------------------------------
+        // 2. Helper for returning validation errors
+        // --------------------------------------------------
+        // Keep the submitted form visible when validation fails.
+        if (bindingResult.hasErrors()) {
+
+            model.addAttribute("quiz", quiz);
+            model.addAttribute(
+                    "errorMessage",
+                    "Some form fields could not be processed. Please check your input."
+            );
+
+            return "teacher/edit-quiz";
+        }
+
+        // --------------------------------------------------
+        // 3. Prevent editing while students have active attempts
+        // --------------------------------------------------
+        boolean hasInProgressAttempts = attempts.findByQuiz_Id(id)
+                .stream()
+                .anyMatch(attempt
+                        -> "IN_PROGRESS".equals(attempt.getStatus()));
+
+        if (hasInProgressAttempts) {
+
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "This quiz cannot be edited while a student has an active attempt."
+            );
+
+            return "redirect:/teacher";
+        }
+
+        // --------------------------------------------------
+        // 4. Validate quiz information
+        // --------------------------------------------------
+        if (form.getTitle() == null || form.getTitle().isBlank()
+                || form.getSubject() == null || form.getSubject().isBlank()
+                || form.getDescription() == null || form.getDescription().isBlank()) {
+
+            model.addAttribute("quiz", quiz);
+            model.addAttribute(
+                    "errorMessage",
+                    "Title, subject, and description are required."
+            );
+
+            return "teacher/edit-quiz";
+        }
+
+        // --------------------------------------------------
+        // 5. Validate exactly 10 questions
+        // --------------------------------------------------
+        if (form.getQuestions() == null
+                || form.getQuestions().size() > 10) {
+
+            model.addAttribute("quiz", quiz);
+            model.addAttribute(
+                    "errorMessage",
+                    "Every quiz must contain exactly 10 questions."
+            );
+
+            return "teacher/edit-quiz";
+        }
+
+        // --------------------------------------------------
+        // 6. Get existing questions
+        // --------------------------------------------------
+        Map<Long, Question> existingQuestions = quiz.getQuestions()
+                .stream()
+                .collect(Collectors.toMap(
+                        Question::getId,
+                        question -> question
+                ));
+
+        // --------------------------------------------------
+        // 7. Validate submitted question IDs
+        // --------------------------------------------------
+        Set<Long> submittedQuestionIds = form.getQuestions()
+                .stream()
+                .map(QuestionEditForm::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (submittedQuestionIds.size() > 10
+                || !submittedQuestionIds.equals(existingQuestions.keySet())) {
+
+            model.addAttribute("quiz", quiz);
+            model.addAttribute(
+                    "errorMessage",
+                    "The submitted questions do not match this quiz. No changes were saved."
+            );
+
+            return "teacher/edit-quiz";
+        }
+
+        // --------------------------------------------------
+        // 8. Validate every question BEFORE changing anything
+        // --------------------------------------------------
+        for (QuestionEditForm q : form.getQuestions()) {
+
+            if (q.getQuestionText() == null || q.getQuestionText().isBlank()
+                    || q.getOptionA() == null || q.getOptionA().isBlank()
+                    || q.getOptionB() == null || q.getOptionB().isBlank()
+                    || q.getOptionC() == null || q.getOptionC().isBlank()
+                    || q.getOptionD() == null || q.getOptionD().isBlank()
+                    || q.getExplanation() == null || q.getExplanation().isBlank()
+                    || q.getCorrectOption() == null
+                    || !List.of("A", "B", "C", "D")
+                            .contains(q.getCorrectOption())) {
+
+                model.addAttribute("quiz", quiz);
+                model.addAttribute(
+                        "errorMessage",
+                        "Please complete every question, all four options, the correct answer, and the explanation."
+                );
+
+                return "teacher/edit-quiz";
+            }
+        }
+
+        // --------------------------------------------------
+        // 9. Update quiz information
+        // --------------------------------------------------
+        quiz.setTitle(form.getTitle().trim());
+        quiz.setSubject(form.getSubject().trim());
+        quiz.setDescription(form.getDescription().trim());
+
+        // Published quizzes return to draft after editing.
+        if ("PUBLISHED".equals(quiz.getStatus())) {
+            quiz.unpublish();
+        }
+
+        // --------------------------------------------------
+        // 10. Update existing questions IN PLACE
+        // --------------------------------------------------
+        for (int i = 0; i < form.getQuestions().size(); i++) {
+
+            QuestionEditForm submitted = form.getQuestions().get(i);
+
+            // Retrieve the original managed entity.
+            Question question = existingQuestions.get(submitted.getId());
+
+            question.setQuestionText(submitted.getQuestionText().trim());
+
+            question.setOptionA(submitted.getOptionA().trim());
+            question.setOptionB(submitted.getOptionB().trim());
+            question.setOptionC(submitted.getOptionC().trim());
+            question.setOptionD(submitted.getOptionD().trim());
+
+            question.setCorrectOption(submitted.getCorrectOption());
+            question.setExplanation(submitted.getExplanation().trim());
+
+            question.setQuestionOrder(i + 1);
+
+            // --------------------------------------------------
+            // 11. Handle image updates
+            // --------------------------------------------------
+            MultipartFile imageFile = submitted.getImageFile();
+
+            if (imageFile != null && !imageFile.isEmpty()) {
+
+                // A new image replaces the existing image.
+                String newImagePath = questionImageService.save(imageFile);
+
+                question.setImagePath(newImagePath);
+
+            } else if (submitted.isRemoveImage()) {
+
+                // Remove the image reference without deleting the
+                // underlying file, which may be used by historical data.
+                question.setImagePath(null);
+            }
+
+            // No repository save is needed for each question:
+            // these are managed entities inside the current transaction.
+        }
+
+        // --------------------------------------------------
+        // 12. Flush database changes
+        // --------------------------------------------------
+        quizzes.saveAndFlush(quiz);
+
+        // --------------------------------------------------
+        // 13. Success
+        // --------------------------------------------------
+        ra.addFlashAttribute(
+                "successMessage",
+                "Quiz updated successfully. It is now a draft and must be published again."
         );
 
         return "redirect:/teacher";
@@ -900,7 +1191,15 @@ public class WebController {
                     attempt,
                     question,
                     selected,
-                    question.getCorrectOption().equals(selected)
+                    question.getCorrectOption().equals(selected),
+                    question.getQuestionText(),
+                    question.getOptionA(),
+                    question.getOptionB(),
+                    question.getOptionC(),
+                    question.getOptionD(),
+                    question.getCorrectOption(),
+                    question.getExplanation(),
+                    question.getImagePath()
             ));
         }
 
@@ -963,16 +1262,48 @@ public class WebController {
 
     @GetMapping("/attempt/{id}")
     @Transactional
-    public String result(@PathVariable Long id, Authentication auth, Model model, RedirectAttributes ra) {
-        QuizAttempt attempt = attempts.findByIdAndStudentUsername(id, auth.getName()).orElse(null);
+    public String result(
+            @PathVariable Long id,
+            Authentication auth,
+            Model model,
+            RedirectAttributes ra) {
+
+        // Find the attempt belonging to the logged-in student.
+        QuizAttempt attempt = attempts
+                .findByIdAndStudentUsername(id, auth.getName())
+                .orElse(null);
+
         if (attempt == null) {
             ra.addFlashAttribute("error", "Result not found.");
             return "redirect:/student";
         }
-        Quiz quiz = quizzes.findWithQuestionsById(attempt.getQuiz().getId()).orElseThrow();
+
+        // Only submitted attempts should have a result page.
+        if (!"SUBMITTED".equals(attempt.getStatus())) {
+            ra.addFlashAttribute(
+                    "error",
+                    "This quiz attempt has not been submitted yet."
+            );
+
+            return "redirect:/student";
+        }
+
+        // Load the quiz for its title and other general information.
+        Quiz quiz = quizzes
+                .findWithQuestionsById(attempt.getQuiz().getId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Quiz not found"
+                ));
+
+        // Load the historical answers and their snapshots.
+        List<AttemptAnswer> attemptAnswers
+                = answers.findByAttemptIdOrderByIdAsc(id);
+
         model.addAttribute("attempt", attempt);
         model.addAttribute("quiz", quiz);
-        model.addAttribute("selectedByQuestion", resultSelections(attempt.getId(), quiz));
+        model.addAttribute("attemptAnswers", attemptAnswers);
+
         return "student/result";
     }
 

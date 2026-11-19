@@ -157,6 +157,15 @@ CREATE TABLE attempt_answers (
     selected_option VARCHAR(1) NOT NULL,
     is_correct BOOLEAN NOT NULL,
 
+    question_text_snapshot TEXT,
+    option_a_snapshot TEXT,
+    option_b_snapshot TEXT,
+    option_c_snapshot TEXT,
+    option_d_snapshot TEXT,
+    correct_option_snapshot VARCHAR(1),
+    explanation_snapshot TEXT,
+    image_path_snapshot VARCHAR(500),
+
     CONSTRAINT fk_answer_attempt
         FOREIGN KEY (attempt_id)
         REFERENCES quiz_attempts(id)
