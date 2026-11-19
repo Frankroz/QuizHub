@@ -1,3 +1,4 @@
+
 - [x] Student dashboard statistics
 - [x] Teacher analytics
 - [x] Question navigation
@@ -15,3 +16,8 @@
  - [x] Error page
 - [ ] Leaderboard
 - [ ] Difficulty levels
+- [ ] Security testing
+- [ ] Unit and integration tests
+- [ ] Responsive design improvements
+- [ ] Database optimization
+- [ ] Deployment documentation
