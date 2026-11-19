@@ -1435,4 +1435,9 @@ public class WebController {
 
         return "redirect:/teacher";
     }
+
+    @GetMapping("/test-error")
+    public String testError() {
+        throw new RuntimeException("Testing QuizHub error handling");
+    }
 }
