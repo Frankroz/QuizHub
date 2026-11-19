@@ -1,0 +1,17 @@
+- [x] Student dashboard statistics
+- [x] Teacher analytics
+- [x] Question navigation
+- [x] Review individual attempts
+- [x] Question and answer randomization
+- [x] Add images on the quizzes
+  - [x] Teachers' side
+  - [x] Students' side
+  - [x] Submit
+  - [x] Reviews' side
+- [x] Quiz actions
+  - [x] Unpublish
+  - [x] Edit
+  - [x] Delete
+ - [x] Error page
+- [ ] Leaderboard
+- [ ] Difficulty levels
